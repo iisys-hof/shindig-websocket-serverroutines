@@ -1,0 +1,533 @@
+# Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+#
+# This file is part of "Neo4j WebSocket Server".
+#
+# "Neo4j WebSocket Server" is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+
+                Apache Shindig WebSocket Server Routines
+
+  What is it?
+  -----------
+
+  The server part of an Apache Shindig Backend, providing Java implementations
+  for procedures for Apache Shindig's requests that can be injected into a
+  Neo4j WebSocket Server.
+
+
+  System Requirements
+  -------------------
+
+  Java:
+    1.7 or above.
+
+  Neo4j WebSocket common resources:
+    neo4j-websocket-common
+
+  Neo4j WebSocket Server:
+    neo4j-websocket-server
+
+  Neo4j WebSocket common resources for Apache Shindig:
+    shindig-websocket-common
+
+  Installing Apache Shindig WebSocket Server Routines
+  ---------------------------------------------------
+
+  Installing to the local Maven repository:
+
+    1. Download the source code of "neo4j-websocket-common" and extract it
+
+    5. Open a terminal and enter the root directory containing the file pom.xml
+
+    6. execute 'mvn install'
+
+    4. Download the source code of "neo4j-websocket-server" and extract it
+
+    5. Open a terminal and enter the root directory containing the file pom.xml
+
+    6. execute 'mvn install'
+
+    7. Download the source code of "shindig-websocket-common" and extract it
+
+    8. Open a terminal and enter the root directory containing the file pom.xml
+
+    9. execute 'mvn install'
+
+    10. Download the source code of "shindig-websocket-serverroutines" and
+      extract it
+
+    11. Open a terminal and enter the root directory containing the file pom.xml
+
+    12. execute 'mvn install'
+
+  Alternatively, you can use precompiled jars.
+
+
+  Injecting into a Neo4j WebSocket Server:
+
+    1. Add the jar file to the server's classpath
+      (see neo4j-websocket-server documentation on how to inject Java
+      procedures using Guice)
+
+    2. Create a new text file or use an existing one defining the Java
+      procedures that will be injected and add:
+
+        de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.ShindigNativeModule
+        shindigNative
+
+    3. If you created a new file or modified an unused one, add the file to the
+      servers "websocket.stored.native" property in the file
+      "neo4j-websocket-server.properties".
+      (see neo4j-websocket-server documentation on how to inject Java
+      procedures using Guice)
+
+    4. Start the server, the procedures will be loaded when a client connects.
+
+
+  Using Apache Shindig WebSocket Server Routines
+  ----------------------------------------------
+
+  Maven Dependencies:
+
+    <dependency>
+      <groupId>de.hofuniversity.iisys</groupId>
+      <artifactId>shindig-websocket-common</artifactId>
+      <version>0.0.1-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+      <groupId>de.hofuniversity.iisys</groupId>
+      <artifactId>neo4j-websocket-server</artifactId>
+      <version>0.0.1-SNAPSHOT</version>
+    </dependency>
+
+  	<dependency>
+  		<groupId>de.hofuniversity.iisys</groupId>
+  		<artifactId>shindig-websocket-common</artifactId>
+  		<version>0.0.1-SNAPSHOT</version>
+  	</dependency>
+
+    <dependency>
+      <groupId>de.hofuniversity.iisys</groupId>
+      <artifactId>shindig-websocket-serverroutines</artifactId>
+      <version>0.0.1-SNAPSHOT</version>
+    </dependency>
+
+
+  The procedures contained mostly support the predefined sorting, filtering
+  and paging parameters, such as:
+
+    "s_s" - subset first index (paging)
+    "s_n" - subset size (paging)
+
+    "sg"  - sort by field
+    "so"  - sort order ("a"scending or "d"escending)
+
+    "ff"  - filter by field
+    "fv"  - filter by value
+    "fo"  - filter operation:
+                "c"  - value contains
+                "e"  - value equals
+                "sw" - value starts with
+                "ew" - value ends with
+                "h"  - has a value (doesn't require "fv")
+
+
+  The following stored procedures will be available:
+
+    People:
+      getPeople - retrieve one or more people
+        parameters:
+          "userIds" - list of user IDs to retrieve
+          "groupId" - list of group IDs to retrieve for these people
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with person Maps
+
+      getPerson - retrieve one person
+        parameters:
+          "userId" - the person's ID
+          "fields" - list of fields to retrieve
+        returns:
+          SingleResult with a person Map
+
+      updatePerson - updates an existing person with the given data
+        parameters:
+          "userId" - the person's ID
+          "person" - person Map/object
+        returns:
+          SingleResult with an updated person Map
+
+      getAllPeople - retrieves all available/visible people
+        parameters:
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with person Maps
+
+      createPerson - creates a person with the given data
+        parameters:
+          "person" - person Map/object
+        returns:
+          ListResult with person Maps
+
+      deletePerson - deletes/deactivates a person (currently not activated)
+        parameters:
+          "userId" - the person's ID
+        returns:
+          nothing
+
+
+    Friends:
+      getFriendRequests - retrieves friendship requests for a person
+        parameters:
+          "userId" - the person's ID
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with person Maps
+
+      requestFriendship - sends a friendship request to another user or
+                          confirms her or his request
+        parameters:
+          "userId" - the requesting person's ID
+          "target" - ID of the other person
+        returns:
+          nothing
+
+      denyFriendship - denies a friendship requests from another user or
+                      terminates an existing friendship
+        parameters:
+          "userId" - the denying person's ID
+          "target" - ID of the other person
+        returns:
+          nothing
+
+
+    Groups:
+      getGroups - retrieves a list of groups for a person
+        parameters:
+          "userId" - the person's ID
+          "fields" - list of the fields to retrieve
+        returns:
+          ListResult with group Maps
+
+    Graph:
+      getFriendsOfFriends - get friends of friends for a person up to a certain
+                            depth (including first-level friends)
+        parameters:
+          "userIds" - IDs of the people whose friends of friends are requested
+          "depth" - depth up to which to retrieve friends of friends
+          "unknown" - whether to only retrieve unknown friends
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with person Maps
+
+      getShortestPath - get the shortest path between two people formed by
+                        relationships
+        parameters:
+          "userId" - the requesting person's ID
+          "target" - ID of the other person
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with person Maps of people along the path
+
+      getGroupRecommendation - get a group recommendation based on friends'
+                              group memberships
+        parameters:
+          "userId" - the requesting person's ID
+          "minFriendsInGroup" - minimum number of friends in a group
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with group Maps ordered by number of friends in them
+
+      getFriendRecommendation - get a friend recommendation based on friends'
+                                friendships
+        parameters:
+          "userId" - the requesting person's ID
+          "getFriendRecommendation" - minimum number of common friends for
+                                      suggested friends
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with person Maps ordered by number of common friends
+
+
+    Activity Streams:
+      getActivityEntries - retrieves activity entries for people
+        parameters:
+          "userIds" - list of user IDs
+          "groupId" - ID of group to fetch activity entries for
+          "appId" - application ID to fetch activity entries for (unused)
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with activity entry Maps
+
+      getActivityEntriesById - retrieves activity entries by their ID for a
+                              person
+        parameters:
+          "userId" - the requesting person's ID
+          "groupId" - ID of the group to fetch activities for
+          "appId" - application ID to fetch activity entries for (unused)
+          "fields" - list of fields to retrieve
+          "activityIds" - list of activity IDs
+        returns:
+          ListResult with activity entry Maps
+
+      getActivityEntry - retrieves a single activity entry for a person
+        parameters:
+          "userId" - the requesting person's ID
+          "groupId" - ID of the group to fetch an activity for (unused)
+          "appId" - application ID to fetch an activity for (unused)
+          "activityId" - ID of the activity to retrieve
+          "fields" - list of fields to retrieve
+        returns:
+          SingleResult with activity entry Map
+
+      deleteActivityEntries - deletes activity entries for a person
+        parameters:
+          "userId" - the requesting person's ID
+          "groupId" - ID of the group to delete activities for (unused)
+          "appId" - application ID to delete activity entries for (unused)
+          "activityIds" - list of activity IDs to delete
+
+      updateActivityEntry - updates an existing activity entry
+        parameters:
+          "userId" - the requesting person's ID
+          "groupId" - ID of the group to update an activity for (unused)
+          "appId" - application ID to update an activity entry for (unused)
+          "activityId" - ID of the activity entry to update
+          "activityEntry" - activity entry Map containing the updated data
+          "fields" - list of fields to update/retrieve (unused)
+        returns:
+          SingleResult with updated activity entry Map
+
+      createActivityEntry - creates a new activity entry
+        parameters:
+          "userId" - the requesting person's ID
+          "groupId" - ID of the group to create an activity for (unused)
+          "appId" - application ID to create an activity entry for (unused)
+          "activityEntry" - activity entry Map containing new data
+          "fields" - list of fields to retrieve
+        returns:
+          SingleResult with created activity entry Map
+
+
+    Application Data:
+      getAppData - retrieves stored application data for a list of people
+        parameters:
+          "userIds" - list of user IDs to retrieve data for
+          "groupId" - ID of the group to fetch data for (unused)
+          "appId" - ID of the application to fetch data for
+          "fields" - list of fields to retrieve
+        returns:
+          SingleResult with app data Maps by user ID
+
+      deleteAppData - deletes application data for a user
+        parameters:
+          "userId" - ID of the user to delete application data for
+          "groupId" - ID of the group to delete data for (unused)
+          "appId" - ID of the application to delete data for
+          "fields" - list of fields to delete (unused?)
+        returns:
+          nothing
+
+      updateAppData - updates application data for a user
+                      (also used for initial creation)
+        parameters:
+          "userId" - ID of the user to update application data for
+          "groupId" - ID of the group to update data for (unused)
+          "appId" - ID of the application to update data for
+          "appData" - application data map
+        returns:
+          nothing
+
+
+    Messages:
+      getMessageCollections - retrieves message collections for a user
+        parameters:
+          "userId" - ID of the user to fetch collections for
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with message collection Maps
+
+      createMessageCollection - creates a message collection for a user
+        parameters:
+          "userId" - ID of the user to create a collection for
+          "messageCollection" - collection Map with initial data
+        returns:
+          SingleResult with the newly create message collection Map
+
+      deleteMessageCollection - deletes a message collection for a user
+        parameters:
+          "userId" - ID of the user to delete a collection for
+          "messCollId" - ID of the collection to delete
+        returns:
+          nothing
+
+      getMessages - retrieves messages for a user
+        parameters:
+          "userId" - ID of the user to fetch messages for
+          "messCollId" - ID of the collection to fetch messages from (optional)
+          "messageIds" - list of message IDs to retrieve (optional)
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with message Maps
+
+      createMessage - creates a message for a user, sending it if created in
+                      the "@outbox"
+        parameters:
+          "userId" - ID of the user to create a message for
+          "appId" - ID of the application sending the message (unused)
+          "messCollId" - ID of the message collection to create the message in
+          "message" - message Map containing the message's data
+        returns:
+          nothing
+
+      deleteMessages - deletes a list of messages for a user
+        parameters:
+          "userId" - ID of the user to delete messages for
+          "messCollId" - ID of the message collection to delete messages in
+          "messageIds" - list of message IDs to delete
+        return:
+          nothing
+
+      modifyMessage - modifies a message for a user
+        parameters:
+          "userId" - ID of the user to modify a message for
+          "messCollId" - ID of the message collection the message is in
+          "messageId" - ID of the message to modify
+          "message" - message Map containing the new data
+        returns:
+          nothing
+
+
+    Albums:
+      getAlbum - retrieves an album for a user
+        parameters:
+          "userId" - ID of the user to fetch an album for
+          "appId" - ID of the application to fetch an album for (unused)
+          "albumId" - ID of the album to fetch
+          "fields" - list of fields to retrieve
+        returns:
+          SingleResult containing the album Map
+
+      getAlbums - retrieves a list of albums for a user
+        parameters:
+          "userId" - ID of the user to fetch albums for
+          "appId" - ID of the application to fetch albums for (unused)
+          "albumIds" - list of album IDs to retrieve
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult containing album maps
+
+      getGroupAlbums - retrieves a list of albums for a list of people or a
+                      group
+        parameters:
+          "userIds" - ID list of the user IDs to fetch albums for
+          "groupId" - ID of the group to fetch albums for
+          "appId" - ID of the application to fetch albums for (unused)
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult containing album maps
+
+      deleteAlbum - deletes an album for a user
+        parameters:
+          "userId" - ID of the user to delete an album for
+          "appId" - ID of the application to delete an album for (unused)
+          "albumId" - ID of the album to delete
+        returns:
+          nothing
+
+      createAlbum - creates an album for a user
+        parameters:
+          "userId" - ID of the user to create an album for
+          "appId" - ID of the application to create an album for (unused)
+          "album" - album Map containing the data to use
+        returns:
+          nothing
+
+      updateAlbum - updates an album for a user
+        parameters:
+          "userId" - ID of the user to update an album for
+          "appId" - ID of the application to update an album for (unused)
+          "albumId" - ID of the album to update
+          "album" - album Map containing the data to use
+        returns:
+          nothing
+
+
+    MediaItems:
+      getMediaItem - retrieves a media item for a user
+        parameters:
+          "userId" - ID of the user to fetch a media item for
+          "appId" - ID of the application to fetch a media item for (unused)
+          "albumId" - ID of the album to fetch the media item from
+          "mediaItemId" - ID of the media item to retrieve
+          "fields" - list of fields to retrieve
+        returns
+          SingleResult with a media item Map
+
+      getMediaItemsById - retrieves a list of media items by their ID
+        parameters:
+          "userId" - ID of the user to fetch media items for
+          "appId" - ID of the application to fetch media items for (unused)
+          "albumId" - ID of the album to fetch the media items from
+          "mediaItemIds" - list of media item IDs to retrieve
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with media item Maps
+
+      getMediaItems - retrieves media items for a user
+        parameters:
+          "userId" - ID of the user to fetch media items for
+          "appId" - ID of the application to fetch media items for (unused)
+          "albumId" - ID of the album to fetch the media items from
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with media item Maps
+
+      getGroupMediaItems - retrieves media items for a group of people
+        parameters:
+          "userIds" - list of IDs of the users to fetch media items for
+          "groupId" - ID of the group to fetch media items for for
+          "appId" - ID of the application to fetch media items for (unused)
+          "fields" - list of fields to retrieve
+        returns:
+          ListResult with media item Maps
+
+      deleteMediaItem - deletes a media item for a user
+        parameters:
+          "userId" - ID of the user to delete a media item for
+          "appId" - ID of the application to delete a media item for (unused)
+          "albumId" - ID of the album to delete the media item from
+          "mediaItemId" - ID of the media item to delete
+        returns:
+          nothing
+
+      createMediaItem - creates a media item for a user
+        parameters:
+          "userId" - ID of the user to create a media item for
+          "appId" - ID of the application to create a media item for (unused)
+          "albumId" - ID of the album to create the media item in
+          "mediaItem" - media item data Map
+        returns:
+          nothing
+
+      updateMediaItem - updates a media item for a user
+        parameters:
+          "userId" - ID of the user to update a media item for
+          "appId" - ID of the application to update a media item for (unused)
+          "albumId" - ID of the album to update the media item in
+          "mediaItemId" - ID of the media item to update
+          "mediaItem" - media item Map with new data
+        returns:
+          nothing
