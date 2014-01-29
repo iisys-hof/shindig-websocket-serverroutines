@@ -47,18 +47,30 @@
   Installing to the local Maven repository:
 
     1. Download the source code of "neo4j-websocket-common" and extract it
+      The projects's sources can be found at
+      "https://github.com/iisys-hof/neo4j-websocket-common"
+      and can be downloaded using git by executing
+      'git clone https://github.com/iisys-hof/neo4j-websocket-common.git'.
 
-    5. Open a terminal and enter the root directory containing the file pom.xml
+    2. Open a terminal and enter the root directory containing the file pom.xml
 
-    6. execute 'mvn install'
+    3. execute 'mvn install'
 
     4. Download the source code of "neo4j-websocket-server" and extract it
+      The server's sources can be found at
+      "https://github.com/iisys-hof/neo4j-websocket-server"
+      and can be downloaded using git by executing
+      'git clone https://github.com/iisys-hof/neo4j-websocket-server.git'.
 
     5. Open a terminal and enter the root directory containing the file pom.xml
 
     6. execute 'mvn install'
 
     7. Download the source code of "shindig-websocket-common" and extract it
+      The projects's sources can be found at
+      "https://github.com/iisys-hof/shindig-websocket-common"
+      and can be downloaded using git by executing
+      'git clone https://github.com/iisys-hof/shindig-websocket-common.git'.
 
     8. Open a terminal and enter the root directory containing the file pom.xml
 
@@ -66,10 +78,16 @@
 
     10. Download the source code of "shindig-websocket-serverroutines" and
       extract it
+      The projects's sources can be found at
+      "https://github.com/iisys-hof/shindig-websocket-common"
+      and can be downloaded using git by executing
+      'git clone https://github.com/iisys-hof/shindig-websocket-common.git'.
 
     11. Open a terminal and enter the root directory containing the file pom.xml
 
     12. execute 'mvn install'
+
+    13. You should now find a library jar file in the 'target' directory.
 
   Alternatively, you can use precompiled jars.
 
@@ -87,7 +105,7 @@
         shindigNative
 
     3. If you created a new file or modified an unused one, add the file to the
-      servers "websocket.stored.native" property in the file
+      server's "websocket.stored.native" property in the file
       "neo4j-websocket-server.properties".
       (see neo4j-websocket-server documentation on how to inject Java
       procedures using Guice)
