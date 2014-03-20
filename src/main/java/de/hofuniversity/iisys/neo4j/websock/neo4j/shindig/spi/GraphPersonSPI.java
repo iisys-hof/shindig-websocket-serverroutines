@@ -276,12 +276,13 @@ public class GraphPersonSPI {
     final List<Node> nodeList = new ArrayList<Node>(targets);
 
     // filter
-    // TODO: filter is not recognized yet
-    if ("isFriendsWith".equals(options.get(WebsockConstants.FILTER_OPERATION))) {
+    if ("isFriendsWith".equals(options.get(WebsockConstants.FILTER_FIELD))) {
       final String filterId = (String) options.get(WebsockConstants.FILTER_VALUE);
       final Node filterNode = getPersonNode(filterId);
 
       PersonFilter.filterNodes(nodeList, filterNode);
+    } else if (OSFields.GROUP_TYPE_ALL.equals(options.get(WebsockConstants.FILTER_FIELD))) {
+      PersonFilter.filterNodes(nodeList, options.get(WebsockConstants.FILTER_VALUE).toString());
     } else {
       NodeFilter.filterNodes(nodeList, options);
     }
@@ -478,7 +479,7 @@ public class GraphPersonSPI {
 
     // filter
     if (options != null && options.get(WebsockConstants.FILTER_OPERATION) != null) {
-      if (options.get(WebsockConstants.FILTER_OPERATION).equals(OSFields.GROUP_TYPE_ALL)) {
+      if (OSFields.GROUP_TYPE_ALL.equals(options.get(WebsockConstants.FILTER_FIELD))) {
         PersonFilter.filterNodes(nodeList, (String) options.get(WebsockConstants.FILTER_VALUE));
       } else {
         NodeFilter.filterNodes(nodeList, options);
