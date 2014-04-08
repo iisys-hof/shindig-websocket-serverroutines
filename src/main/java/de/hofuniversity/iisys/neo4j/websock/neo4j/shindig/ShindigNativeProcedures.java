@@ -104,6 +104,7 @@ public class ShindigNativeProcedures implements IProcedureProvider {
     final GraphAppDataSPI appDataSPI = new GraphAppDataSPI(this.fDb, personSPI, appSPI, this.fImpl);
 
     final GraphMessageSPI messageSPI = new GraphMessageSPI(this.fDb, personSPI, idMan, this.fImpl);
+    personSPI.setMessages(messageSPI);
 
     final GraphAlbumSPI albumSPI = new GraphAlbumSPI(this.fDb, personSPI, idMan, this.fImpl);
     final GraphMediaItemSPI mediaItemSPI = new GraphMediaItemSPI(this.fDb, personSPI, idMan,

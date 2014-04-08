@@ -161,16 +161,41 @@ public class GraphMessage implements IGraphObject {
      * get IDs from the starting points (collections) of all relations that assign this message to a
      * message collection
      */
-    final List<String> collectionIds = new ArrayList<String>();
+    final Set<String> collectionIds = new HashSet<String>();
 
+    // get all message collections for the current user to match them
+    final Set<Node> collNodes = new HashSet<Node>();
+    if (this.fStatusRel != null) {
+      final Node coll = this.fStatusRel.getStartNode();
+      if (coll != null) {
+        final Relationship userRel = coll.getSingleRelationship(Neo4jRelTypes.OWNS,
+                Direction.INCOMING);
+
+        if (userRel != null) {
+          final Node user = userRel.getStartNode();
+
+          final Iterable<Relationship> collRels = user.getRelationships(Neo4jRelTypes.OWNS,
+                  Direction.OUTGOING);
+          for (final Relationship rel : collRels) {
+            collNodes.add(rel.getEndNode());
+          }
+        }
+      }
+    }
+
+    // filter all "contained in" relationships
     final Iterable<Relationship> containedIns = this.fNode.getRelationships(Neo4jRelTypes.CONTAINS);
 
     Node collection = null;
     String collId = null;
     for (final Relationship rel : containedIns) {
       collection = rel.getStartNode();
-      collId = (String) collection.getProperty(GraphMessage.ID_FIELD);
-      collectionIds.add(collId);
+
+      // filter out all collections that belong to a different user
+      if (collNodes.contains(collection)) {
+        collId = (String) collection.getProperty(GraphMessage.ID_FIELD);
+        collectionIds.add(collId);
+      }
     }
 
     if (!collectionIds.isEmpty()) {

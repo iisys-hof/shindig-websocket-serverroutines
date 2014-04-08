@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2014 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -18,6 +18,7 @@
  */
 package de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -740,5 +741,29 @@ public class GraphMessageSPI {
     } else {
       throw new RuntimeException("messages can not be modified after they were sent");
     }
+  }
+
+  /**
+   * Creates the default message collections for a user. The given ID must not be null.
+   *
+   * @param userId
+   *          ID of the user to create collections for
+   */
+  public void createDefaultCollections(String userId) {
+    // inbox
+    final Map<String, Object> msgCollection = new HashMap<String, Object>();
+    msgCollection.put("id", OSFields.INBOX_NAME);
+    msgCollection.put("title", userId + "'s inbox");
+
+    // create
+    this.createMessageCollection(userId, msgCollection);
+
+    // outbox
+    msgCollection.clear();
+    msgCollection.put("id", GraphMessageSPI.OUTBOX_NAME);
+    msgCollection.put("title", userId + "'s outbox");
+
+    // create
+    this.createMessageCollection(userId, msgCollection);
   }
 }

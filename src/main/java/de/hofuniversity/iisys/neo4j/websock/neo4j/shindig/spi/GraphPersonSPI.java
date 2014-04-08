@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2014 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -64,6 +64,8 @@ public class GraphPersonSPI {
 
   private final Logger fLogger;
 
+  private GraphMessageSPI fMessages;
+
   /**
    * Creates a graph person service using data from the given neo4j database service, according to
    * the given configuration. Throws a NullPointerException if the given service or configuration
@@ -94,6 +96,16 @@ public class GraphPersonSPI {
     this.fImpl = impl;
 
     this.fLogger = Logger.getLogger(this.getClass().getName());
+  }
+
+  /**
+   * Sets the message service used to create initial message collections for new users.
+   *
+   * @param messages
+   *          message service to use
+   */
+  public void setMessages(GraphMessageSPI messages) {
+    this.fMessages = messages;
   }
 
   /**
@@ -574,6 +586,11 @@ public class GraphPersonSPI {
       updateExternal(node, person);
 
       resultPerson = convertPerson(node, null);
+
+      // create initial message collections
+      if (this.fMessages != null) {
+        this.fMessages.createDefaultCollections(personId);
+      }
 
       trans.success();
       trans.finish();

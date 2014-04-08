@@ -116,15 +116,22 @@ public class GraphMessageTest {
     this.fMessageNode.setProperty(GraphMessageTest.RECIPIENTS_FIELD, GraphMessageTest.RECIPIENTS);
     this.fMessageNode.setProperty(GraphMessageTest.URLS_FIELD, GraphMessageTest.URLS);
 
+    // user
+    final Node userNode = this.fDb.createNode();
+
     // collections
     final Node coll1Node = this.fDb.createNode();
     coll1Node.setProperty(GraphMessageTest.ID_FIELD, GraphMessageTest.COLL1_ID);
     this.fConRel = coll1Node.createRelationshipTo(this.fMessageNode, Neo4jRelTypes.CONTAINS);
     this.fConRel.setProperty(GraphMessageTest.STATUS_FIELD, GraphMessageTest.STATUS);
 
+    userNode.createRelationshipTo(coll1Node, Neo4jRelTypes.OWNS);
+
     final Node coll2Node = this.fDb.createNode();
     coll2Node.setProperty(GraphMessageTest.ID_FIELD, GraphMessageTest.COLL2_ID);
     coll2Node.createRelationshipTo(this.fMessageNode, Neo4jRelTypes.CONTAINS);
+
+    userNode.createRelationshipTo(coll2Node, Neo4jRelTypes.OWNS);
 
     // replies
     final Node reply1Node = this.fDb.createNode();

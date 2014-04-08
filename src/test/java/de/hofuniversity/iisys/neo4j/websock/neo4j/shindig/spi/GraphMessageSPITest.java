@@ -54,7 +54,7 @@ public class GraphMessageSPITest {
   private static final String OUTBOX_NAME = "@outbox";
 
   private static final String JOHN_ID = "john.doe", JANE_ID = "jane.doe", JACK_ID = "jack.doe",
-          HORST_ID = "horst";
+          HORST_ID = "horst", NEWBIE_ID = "newbie";
 
   private GraphDatabaseService fDb;
   private GraphPersonSPI fPersonSPI;
@@ -114,6 +114,10 @@ public class GraphMessageSPITest {
     final Node horst = this.fDb.createNode();
     horst.setProperty(GraphMessageSPITest.ID_FIELD, GraphMessageSPITest.HORST_ID);
     personNodes.add(horst, GraphMessageSPITest.ID_FIELD, GraphMessageSPITest.HORST_ID);
+
+    final Node newbie = this.fDb.createNode();
+    newbie.setProperty(GraphMessageSPITest.ID_FIELD, GraphMessageSPITest.NEWBIE_ID);
+    personNodes.add(newbie, GraphMessageSPITest.ID_FIELD, GraphMessageSPITest.NEWBIE_ID);
 
     // message collections
     final Node johnIn = this.fDb.createNode();
@@ -652,5 +656,34 @@ public class GraphMessageSPITest {
       }
     }
     Assert.assertFalse(found);
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  public void defaulCollectionsTest() throws Exception {
+    this.fMessageSPI.createDefaultCollections(GraphMessageSPITest.NEWBIE_ID);
+
+    final ListResult result = this.fMessageSPI.getMessageCollections(GraphMessageSPITest.NEWBIE_ID,
+            new HashMap<String, Object>(), null);
+
+    final List<Map<String, Object>> list = (List<Map<String, Object>>) result.getResults();
+
+    Assert.assertEquals(2, list.size());
+
+    String id = null;
+    boolean inbox = false;
+    boolean outbox = false;
+    for (final Map<String, Object> coll : list) {
+      id = coll.get("id").toString();
+
+      if (id.equals(OSFields.INBOX_NAME)) {
+        inbox = true;
+      } else if (id.equals("@outbox")) {
+        outbox = true;
+      }
+    }
+
+    Assert.assertTrue(inbox);
+    Assert.assertTrue(outbox);
   }
 }
