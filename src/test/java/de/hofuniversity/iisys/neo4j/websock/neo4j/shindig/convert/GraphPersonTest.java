@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -19,6 +19,8 @@
 package de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -32,10 +34,15 @@ import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.ShindigNativeProcedures;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphOrganizationSPI;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphPersonSPI;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
+import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
- * Test for the person, account, organization, address and list field converter classes.
+ * Test for the person, account, organization, address and list field converter classes. Also covers
+ * the relevant parts of the organization service.
  */
 public class GraphPersonTest {
   private static final String ABOUT_ME_FIELD = "aboutMe";
@@ -77,6 +84,8 @@ public class GraphPersonTest {
   private static final String CHILDREN = "person's children";
   private static final String DISP_NAME = "person's display name";
   private static final String ID = "person's ID";
+  private static final String MAN_PERSON_ID = "manager's ID";
+  private static final String SEC_PERSON_ID = "secretary's ID";
   private static final String JOB_INTS = "person's job interests";
   private static final String NICKNAME = "person's nickname";
   private static final String PREF_USERNAME = "person's preferred username";
@@ -155,6 +164,7 @@ public class GraphPersonTest {
   private static final String TITLE_FIELD = "title";
   private static final String WEBPAGE_FIELD = "webpage";
   private static final String ORG_TYPE_FIELD = "type";
+  private static final String ORG_UNIT_FIELD = "orgUnit";
   private static final String DEPARTMENT_FIELD = "department";
   private static final String MANAGER_ID_FIELD = "managerId";
   private static final String SECRETARY_ID_FIELD = "secretaryId";
@@ -171,9 +181,8 @@ public class GraphPersonTest {
   private static final String ORG_WEB_PAGE = "organization web page";
   private static final String ORG_TYPE = "organization type";
   private static final Boolean AFF_PRIMARY = true;
-  private static final String EXT_AFF_DEPARTMENT = "affiliation department";
-  private static final String EXT_AFF_MANAGER_ID = "affiliation manager ID";
-  private static final String EXT_AFF_SECR_ID = "affiliation secretary ID";
+  private static final String EXT_ORG_UNIT = "affiliation orgUnit";
+  private static final String EXT_DEPARTMENT = "affiliation department";
   private static final Boolean EXT_AFF_DEP_HEAD = true;
 
   // list field list data
@@ -208,6 +217,16 @@ public class GraphPersonTest {
         }
       }
     });
+
+    final Map<String, String> config = new HashMap<String, String>();
+    config.put(GraphOrganizationSPI.CREATE_DEPS, "true");
+
+    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, config);
+    ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
+
+    final GraphPersonSPI personSPI = new GraphPersonSPI(this.fDb, config, new ImplUtil(
+            LinkedList.class, HashMap.class));
+    ShindigNativeProcedures.addService(GraphPersonSPI.class, personSPI);
 
     createTestData();
   }
@@ -254,17 +273,23 @@ public class GraphPersonTest {
     this.fPersonNode.setProperty(GraphPersonTest.TAGS_FIELD, GraphPersonTest.TAGS);
     this.fPersonNode.setProperty(GraphPersonTest.URLS_FIELD, GraphPersonTest.URLS);
 
+    final Node managerNode = this.fDb.createNode();
+    managerNode.setProperty(GraphPersonTest.ID_FIELD, GraphPersonTest.MAN_PERSON_ID);
+
+    final Node secretaryNode = this.fDb.createNode();
+    secretaryNode.setProperty(GraphPersonTest.ID_FIELD, GraphPersonTest.SEC_PERSON_ID);
+
     // account
     final Relationship accRel = this.fPersonNode.createRelationshipTo(this.fDb.createNode(),
-            Neo4jRelTypes.ACCOUNT);
+            ShindigRelTypes.ACCOUNT);
     accRel.setProperty(GraphPersonTest.DOMAIN_FIELD, GraphPersonTest.ACC_DOMAIN);
     accRel.setProperty(GraphPersonTest.USER_ID_FIELD, GraphPersonTest.ACC_USER_ID);
     accRel.setProperty(GraphPersonTest.USER_NAME_FIELD, GraphPersonTest.ACC_USER_NAME);
 
     // address (located at and currently at)
     final Node addNode = this.fDb.createNode();
-    this.fPersonNode.createRelationshipTo(addNode, Neo4jRelTypes.CURRENTLY_AT);
-    this.fPersonNode.createRelationshipTo(addNode, Neo4jRelTypes.LOCATED_AT);
+    this.fPersonNode.createRelationshipTo(addNode, ShindigRelTypes.CURRENTLY_AT);
+    this.fPersonNode.createRelationshipTo(addNode, ShindigRelTypes.LOCATED_AT);
 
     addNode.setProperty(GraphPersonTest.COUNTRY_FIELD, GraphPersonTest.ADD_COUNTRY);
     addNode.setProperty(GraphPersonTest.FORMATTED_FIELD, GraphPersonTest.ADD_FORMATTED);
@@ -277,28 +302,40 @@ public class GraphPersonTest {
     addNode.setProperty(GraphPersonTest.ADD_ADDRESS_FIELD, GraphPersonTest.ADD_ADDRESS);
     addNode.setProperty(GraphPersonTest.ADD_TYPE_FIELD, GraphPersonTest.ADD_TYPE);
 
-    // organization, affiliation
-    final Node orgNode = this.fDb.createNode();
-    orgNode.createRelationshipTo(addNode, Neo4jRelTypes.LOCATED_AT);
-    final Relationship affRel = this.fPersonNode.createRelationshipTo(orgNode,
-            Neo4jRelTypes.AFFILIATED);
-
-    orgNode.setProperty(GraphPersonTest.DESCRIPTION_FIELD, GraphPersonTest.ORG_DESCRIPTION);
+    // organization, orgUnit, department, affiliation
+    // central organization
+    final GraphOrganizationSPI orgSPI = ShindigNativeProcedures
+            .getService(GraphOrganizationSPI.class);
+    final Node orgNode = orgSPI.getOrganization();
     orgNode.setProperty(GraphPersonTest.FIELD_FIELD, GraphPersonTest.ORG_FIELD);
     orgNode.setProperty(GraphPersonTest.NAME_FIELD, GraphPersonTest.ORG_NAME);
     orgNode.setProperty(GraphPersonTest.SUB_FIELD_FIELD, GraphPersonTest.ORG_SUB_FIELD);
     orgNode.setProperty(GraphPersonTest.ORG_TYPE_FIELD, GraphPersonTest.ORG_TYPE);
     orgNode.setProperty(GraphPersonTest.WEBPAGE_FIELD, GraphPersonTest.ORG_WEB_PAGE);
 
+    // organizational unit
+    final Node orgUNode = orgSPI.getOrgUnit(null, GraphPersonTest.EXT_ORG_UNIT);
+    orgUNode.createRelationshipTo(addNode, ShindigRelTypes.LOCATED_AT);
+
+    // department
+    final Node depNode = orgSPI.getOrgUnit(orgUNode, GraphPersonTest.EXT_DEPARTMENT);
+    depNode.createRelationshipTo(this.fPersonNode, ShindigRelTypes.HEAD);
+
+    // affiliation/employment
+    final Relationship affRel = this.fPersonNode.createRelationshipTo(depNode,
+            ShindigRelTypes.EMPLOYED);
+
+    affRel.setProperty(GraphPersonTest.DESCRIPTION_FIELD, GraphPersonTest.ORG_DESCRIPTION);
     affRel.setProperty(GraphPersonTest.END_DATE_FIELD, GraphPersonTest.AFF_END_DATE);
     affRel.setProperty(GraphPersonTest.PRIMARY_FIELD, GraphPersonTest.AFF_PRIMARY);
     affRel.setProperty(GraphPersonTest.SALARY_FIELD, GraphPersonTest.AFF_SALARY);
     affRel.setProperty(GraphPersonTest.START_DATE_FIELD, GraphPersonTest.AFF_START_DATE);
     affRel.setProperty(GraphPersonTest.TITLE_FIELD, GraphPersonTest.AFF_TITLE);
-    affRel.setProperty(GraphPersonTest.DEPARTMENT_FIELD, GraphPersonTest.EXT_AFF_DEPARTMENT);
-    affRel.setProperty(GraphPersonTest.MANAGER_ID_FIELD, GraphPersonTest.EXT_AFF_MANAGER_ID);
-    affRel.setProperty(GraphPersonTest.SECRETARY_ID_FIELD, GraphPersonTest.EXT_AFF_SECR_ID);
-    affRel.setProperty(GraphPersonTest.DEPARTMENT_HEAD_FIELD, GraphPersonTest.EXT_AFF_DEP_HEAD);
+    affRel.setProperty(GraphPersonTest.ORG_UNIT_FIELD, GraphPersonTest.EXT_ORG_UNIT);
+
+    // manager and secretary relations
+    this.fPersonNode.createRelationshipTo(managerNode, ShindigRelTypes.MANAGER);
+    this.fPersonNode.createRelationshipTo(secretaryNode, ShindigRelTypes.SECRETARY);
 
     // list field lists - same converter class, different links
     final Node lflNode = this.fDb.createNode();
@@ -307,13 +344,13 @@ public class GraphPersonTest {
     lflNode.setProperty(GraphPersonTest.LFL_PRIMARY_FIELD, GraphPersonTest.LFL_PRIMARY);
 
     // phone numbers
-    this.fPersonNode.createRelationshipTo(lflNode, Neo4jRelTypes.PHONE_NUMS);
+    this.fPersonNode.createRelationshipTo(lflNode, ShindigRelTypes.PHONE_NUMS);
 
     // email addresses
-    this.fPersonNode.createRelationshipTo(lflNode, Neo4jRelTypes.EMAILS);
+    this.fPersonNode.createRelationshipTo(lflNode, ShindigRelTypes.EMAILS);
 
     // instant messengers
-    this.fPersonNode.createRelationshipTo(lflNode, Neo4jRelTypes.IMS);
+    this.fPersonNode.createRelationshipTo(lflNode, ShindigRelTypes.IMS);
 
     trans.success();
     trans.finish();
@@ -406,21 +443,19 @@ public class GraphPersonTest {
     Assert.assertEquals(addresses.get(0).get(GraphPersonTest.FORMATTED_FIELD),
             GraphPersonTest.ADD_FORMATTED);
 
-    // organization, affiliation
+    // organization/affiliation
     final List<Map<String, Object>> organizations = (List<Map<String, Object>>) p
             .get(GraphPersonTest.ORGANIZATIONS_FIELD);
     Assert.assertEquals(1, organizations.size());
     final Map<String, Object> org = organizations.get(0);
-    Assert.assertEquals(GraphPersonTest.EXT_AFF_DEPARTMENT,
-            org.get(GraphPersonTest.DEPARTMENT_FIELD));
+    Assert.assertEquals(GraphPersonTest.EXT_ORG_UNIT, org.get(GraphPersonTest.ORG_UNIT_FIELD));
+    Assert.assertEquals(GraphPersonTest.EXT_DEPARTMENT, org.get(GraphPersonTest.DEPARTMENT_FIELD));
     Assert.assertEquals(GraphPersonTest.ORG_DESCRIPTION, org.get(GraphPersonTest.DESCRIPTION_FIELD));
     Assert.assertEquals(GraphPersonTest.ORG_FIELD, org.get(GraphPersonTest.FIELD_FIELD));
-    Assert.assertEquals(GraphPersonTest.EXT_AFF_MANAGER_ID,
-            org.get(GraphPersonTest.MANAGER_ID_FIELD));
+    Assert.assertEquals(GraphPersonTest.MAN_PERSON_ID, org.get(GraphPersonTest.MANAGER_ID_FIELD));
     Assert.assertEquals(GraphPersonTest.ORG_NAME, org.get(GraphPersonTest.NAME_FIELD));
     Assert.assertEquals(GraphPersonTest.AFF_SALARY, org.get(GraphPersonTest.SALARY_FIELD));
-    Assert.assertEquals(GraphPersonTest.EXT_AFF_SECR_ID,
-            org.get(GraphPersonTest.SECRETARY_ID_FIELD));
+    Assert.assertEquals(GraphPersonTest.SEC_PERSON_ID, org.get(GraphPersonTest.SECRETARY_ID_FIELD));
     Assert.assertEquals(GraphPersonTest.ORG_SUB_FIELD, org.get(GraphPersonTest.SUB_FIELD_FIELD));
     Assert.assertEquals(GraphPersonTest.AFF_TITLE, org.get(GraphPersonTest.TITLE_FIELD));
     Assert.assertEquals(GraphPersonTest.ORG_TYPE, org.get(GraphPersonTest.ORG_TYPE_FIELD));
@@ -539,7 +574,7 @@ public class GraphPersonTest {
     Assert.assertTrue(Arrays.equals(GraphPersonTest.URLS, urls));
 
     // address (split up due to lack of unique identifiers)
-    final Node currAdd = newPerson.getSingleRelationship(Neo4jRelTypes.CURRENTLY_AT,
+    final Node currAdd = newPerson.getSingleRelationship(ShindigRelTypes.CURRENTLY_AT,
             Direction.OUTGOING).getEndNode();
     Assert.assertEquals(GraphPersonTest.ADD_COUNTRY,
             currAdd.getProperty(GraphPersonTest.COUNTRY_FIELD));
@@ -562,13 +597,13 @@ public class GraphPersonTest {
     Assert.assertEquals(GraphPersonTest.ADD_TYPE,
             currAdd.getProperty(GraphPersonTest.ADD_TYPE_FIELD));
 
-    final Node locAdd = newPerson.getSingleRelationship(Neo4jRelTypes.LOCATED_AT,
+    final Node locAdd = newPerson.getSingleRelationship(ShindigRelTypes.LOCATED_AT,
             Direction.OUTGOING).getEndNode();
     Assert.assertEquals(locAdd.getProperty(GraphPersonTest.FORMATTED_FIELD),
             GraphPersonTest.ADD_FORMATTED);
 
     // affiliation
-    final Relationship aff = newPerson.getSingleRelationship(Neo4jRelTypes.AFFILIATED,
+    final Relationship aff = newPerson.getSingleRelationship(ShindigRelTypes.EMPLOYED,
             Direction.OUTGOING);
     Assert.assertEquals(GraphPersonTest.AFF_SALARY, aff.getProperty(GraphPersonTest.SALARY_FIELD));
     Assert.assertEquals(GraphPersonTest.AFF_TITLE, aff.getProperty(GraphPersonTest.TITLE_FIELD));
@@ -577,34 +612,32 @@ public class GraphPersonTest {
     Assert.assertEquals(GraphPersonTest.AFF_PRIMARY, aff.getProperty(GraphPersonTest.PRIMARY_FIELD));
     Assert.assertEquals(GraphPersonTest.AFF_START_DATE,
             aff.getProperty(GraphPersonTest.START_DATE_FIELD));
-    Assert.assertEquals(GraphPersonTest.EXT_AFF_DEPARTMENT,
-            aff.getProperty(GraphPersonTest.DEPARTMENT_FIELD));
-    Assert.assertEquals(GraphPersonTest.EXT_AFF_MANAGER_ID,
-            aff.getProperty(GraphPersonTest.MANAGER_ID_FIELD));
-    Assert.assertEquals(GraphPersonTest.EXT_AFF_SECR_ID,
-            aff.getProperty(GraphPersonTest.SECRETARY_ID_FIELD));
-    Assert.assertEquals(GraphPersonTest.EXT_AFF_DEP_HEAD,
-            aff.getProperty(GraphPersonTest.DEPARTMENT_HEAD_FIELD));
 
-    // organization
-    final Node org = aff.getEndNode();
-    Assert.assertEquals(GraphPersonTest.ORG_DESCRIPTION,
-            org.getProperty(GraphPersonTest.DESCRIPTION_FIELD));
-    Assert.assertEquals(GraphPersonTest.ORG_FIELD, org.getProperty(GraphPersonTest.FIELD_FIELD));
-    Assert.assertEquals(GraphPersonTest.ORG_NAME, org.getProperty(GraphPersonTest.NAME_FIELD));
-    Assert.assertEquals(GraphPersonTest.ORG_SUB_FIELD,
-            org.getProperty(GraphPersonTest.SUB_FIELD_FIELD));
-    Assert.assertEquals(GraphPersonTest.ORG_TYPE, org.getProperty(GraphPersonTest.ORG_TYPE_FIELD));
-    Assert.assertEquals(GraphPersonTest.ORG_WEB_PAGE,
-            org.getProperty(GraphPersonTest.WEBPAGE_FIELD));
+    // department
+    final Node department = aff.getEndNode();
+    Assert.assertEquals(GraphPersonTest.EXT_DEPARTMENT,
+            department.getProperty(GraphOrganizationSPI.ORGU_NAME_PROP));
 
-    final Node orgAdd = org.getSingleRelationship(Neo4jRelTypes.LOCATED_AT, Direction.OUTGOING)
-            .getEndNode();
-    Assert.assertEquals(orgAdd.getProperty(GraphPersonTest.FORMATTED_FIELD),
-            GraphPersonTest.ADD_FORMATTED);
+    // organizational unit
+    final Node orgUnit = department.getSingleRelationship(ShindigRelTypes.IN_UNIT,
+            Direction.OUTGOING).getEndNode();
+    Assert.assertEquals(GraphPersonTest.EXT_ORG_UNIT,
+            orgUnit.getProperty(GraphOrganizationSPI.ORGU_NAME_PROP));
+
+    // manager
+    final Node manager = newPerson.getSingleRelationship(ShindigRelTypes.MANAGER,
+            Direction.OUTGOING).getEndNode();
+    Assert.assertEquals(GraphPersonTest.MAN_PERSON_ID,
+            manager.getProperty(GraphPersonTest.ID_FIELD));
+
+    // secretary
+    final Node secretary = newPerson.getSingleRelationship(ShindigRelTypes.SECRETARY,
+            Direction.OUTGOING).getEndNode();
+    Assert.assertEquals(GraphPersonTest.SEC_PERSON_ID,
+            secretary.getProperty(GraphPersonTest.ID_FIELD));
 
     // phone numbers
-    final Node phoneNode = newPerson.getSingleRelationship(Neo4jRelTypes.PHONE_NUMS,
+    final Node phoneNode = newPerson.getSingleRelationship(ShindigRelTypes.PHONE_NUMS,
             Direction.OUTGOING).getEndNode();
     String[] types = (String[]) phoneNode.getProperty(GraphPersonTest.LFL_TYPE_FIELD);
     String[] values = (String[]) phoneNode.getProperty(GraphPersonTest.LFL_VALUE_FIELD);
@@ -618,8 +651,8 @@ public class GraphPersonTest {
     Assert.assertEquals(GraphPersonTest.LFL_PRIMARY, primary);
 
     // email addresses, sanity check
-    final Node mailNode = newPerson.getSingleRelationship(Neo4jRelTypes.EMAILS, Direction.OUTGOING)
-            .getEndNode();
+    final Node mailNode = newPerson.getSingleRelationship(ShindigRelTypes.EMAILS,
+            Direction.OUTGOING).getEndNode();
     types = (String[]) mailNode.getProperty(GraphPersonTest.LFL_TYPE_FIELD);
     values = (String[]) mailNode.getProperty(GraphPersonTest.LFL_VALUE_FIELD);
     primary = (Integer) mailNode.getProperty(GraphPersonTest.PRIMARY_FIELD);
@@ -629,7 +662,7 @@ public class GraphPersonTest {
     Assert.assertEquals(GraphPersonTest.LFL_PRIMARY, primary);
 
     // instant messengers, sanity check
-    final Node imNode = newPerson.getSingleRelationship(Neo4jRelTypes.IMS, Direction.OUTGOING)
+    final Node imNode = newPerson.getSingleRelationship(ShindigRelTypes.IMS, Direction.OUTGOING)
             .getEndNode();
     types = (String[]) imNode.getProperty(GraphPersonTest.LFL_TYPE_FIELD);
     values = (String[]) imNode.getProperty(GraphPersonTest.LFL_VALUE_FIELD);

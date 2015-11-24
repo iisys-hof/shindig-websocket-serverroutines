@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -35,7 +35,6 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
-import de.hofuniversity.iisys.neo4j.websock.GraphConfig;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.service.IDManager;
 import de.hofuniversity.iisys.neo4j.websock.result.ListResult;
@@ -82,13 +81,13 @@ public class GraphActivityStreamSPITest {
       }
     });
 
-    final GraphConfig config = new GraphConfig(true);
-    config.setProperty("activityobjects.deduplicate", "true");
+    final Map<String, String> config = new HashMap<String, String>();
+    config.put("activityobjects.deduplicate", "true");
 
     this.fPersonSPI = new GraphPersonSPI(this.fDb, config, new ImplUtil(BasicBSONList.class,
             BasicBSONObject.class));
-    this.fObjectSPI = new ActivityObjectService(this.fDb, config, new ImplUtil(BasicBSONList.class,
-            BasicBSONObject.class));
+    this.fObjectSPI = new ActivityObjectService(this.fDb, config, new IDManager(this.fDb),
+            new ImplUtil(BasicBSONList.class, BasicBSONObject.class));
     this.fAppSPI = new ApplicationService(this.fDb);
     this.fActivityStreamSPI = new GraphActivityStreamSPI(this.fDb, this.fPersonSPI,
             this.fObjectSPI, this.fAppSPI, new IDManager(this.fDb), new ImplUtil(

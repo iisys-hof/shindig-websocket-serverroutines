@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -574,27 +574,42 @@ public class GraphActivityStreamSPI {
     final String id = this.fIDMan.genID(ShindigConstants.ACTIVITY_ENTRY_NODES);
     final Node person = this.fPersonSPI.getPersonNode(userId);
 
-    // TODO: Exception if user is null
-
-    final Transaction tx = this.fDatabase.beginTx();
-
-    final Node actNode = this.fDatabase.createNode();
-    activity.put(OSFields.ID_FIELD, id);
-
-    // store information
-    final GraphActivityEntry gActEntry = storeEntry(actNode, activity);
-
-    // link to user
-    person.createRelationshipTo(actNode, Neo4jRelTypes.ACTED);
-
-    // link to application
-    if (appId != null) {
-      final Node application = this.fApplicationSPI.getApplication(appId);
-      actNode.createRelationshipTo(application, Neo4jRelTypes.CAME_FROM);
+    // user not found
+    if (person == null) {
+      // TODO: more appropriate exception
+      throw new RuntimeException("User with ID \"" + userId + "\" not found");
     }
 
-    tx.success();
-    tx.finish();
+    GraphActivityEntry gActEntry = null;
+    final Transaction tx = this.fDatabase.beginTx();
+
+    try {
+
+      final Node actNode = this.fDatabase.createNode();
+      activity.put(OSFields.ID_FIELD, id);
+
+      // store information
+      gActEntry = storeEntry(actNode, activity);
+
+      // link to user
+      person.createRelationshipTo(actNode, Neo4jRelTypes.ACTED);
+
+      // link to application
+      if (appId != null) {
+        final Node application = this.fApplicationSPI.getApplication(appId);
+        actNode.createRelationshipTo(application, Neo4jRelTypes.CAME_FROM);
+      }
+
+      tx.success();
+      tx.finish();
+    } catch (final Exception e) {
+      this.fLogger.log(Level.SEVERE, e.getMessage(), e);
+
+      tx.failure();
+      tx.finish();
+
+      throw new RuntimeException(e);
+    }
 
     final Map<String, Object> entry = gActEntry.toMap(fieldSet);
     return new SingleResult(entry);

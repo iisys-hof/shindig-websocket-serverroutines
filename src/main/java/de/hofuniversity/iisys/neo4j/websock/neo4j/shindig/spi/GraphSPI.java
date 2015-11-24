@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -42,9 +42,9 @@ import org.neo4j.graphdb.traversal.TraversalDescription;
 import org.neo4j.kernel.Traversal;
 import org.neo4j.kernel.Uniqueness;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert.GraphGroup;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert.GraphPerson;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.util.NodeFilter;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.util.NodeSorter;
 import de.hofuniversity.iisys.neo4j.websock.result.ListResult;
@@ -63,7 +63,7 @@ public class GraphSPI {
   private static final String FORMATTED_FIELD = "formatted";
 
   private static final PathExpander<Path> PATH_EXP = Traversal.pathExpanderForTypes(
-          Neo4jRelTypes.FRIEND_OF, Direction.OUTGOING);
+          ShindigRelTypes.FRIEND_OF, Direction.OUTGOING);
 
   private static final PathFinder<Path> SPATH = GraphAlgoFactory.shortestPath(GraphSPI.PATH_EXP,
           GraphSPI.MAX_SPATH_DEPTH);
@@ -161,7 +161,7 @@ public class GraphSPI {
 
     if (trav == null) {
       trav = Traversal.description().breadthFirst()
-              .relationships(Neo4jRelTypes.FRIEND_OF, Direction.OUTGOING)
+              .relationships(ShindigRelTypes.FRIEND_OF, Direction.OUTGOING)
               .evaluator(Evaluators.includingDepths(1, depth)).uniqueness(Uniqueness.NODE_GLOBAL);
 
       this.fFofTravs.put(depth, trav);
@@ -301,7 +301,7 @@ public class GraphSPI {
   private Map<Node, Integer> getFriendMemberships(Node person) {
     final Map<Node, Integer> memCounts = new HashMap<Node, Integer>();
     final Iterable<Relationship> friendRels = person.getRelationships(Direction.OUTGOING,
-            Neo4jRelTypes.FRIEND_OF);
+            ShindigRelTypes.FRIEND_OF);
 
     Iterable<Relationship> memRels = null;
     Integer count = null;
@@ -310,7 +310,7 @@ public class GraphSPI {
     Node group = null;
     for (final Relationship fRel : friendRels) {
       friend = fRel.getEndNode();
-      memRels = friend.getRelationships(Neo4jRelTypes.MEMBER_OF);
+      memRels = friend.getRelationships(ShindigRelTypes.MEMBER_OF);
 
       for (final Relationship mRel : memRels) {
         group = mRel.getEndNode();
@@ -336,7 +336,7 @@ public class GraphSPI {
     final Map<Node, Integer> memCounts = getFriendMemberships(person);
 
     // remove groups the user is already a member of
-    final Iterable<Relationship> memRels = person.getRelationships(Neo4jRelTypes.MEMBER_OF);
+    final Iterable<Relationship> memRels = person.getRelationships(ShindigRelTypes.MEMBER_OF);
     for (final Relationship mRel : memRels) {
       memCounts.remove(mRel.getEndNode());
     }
@@ -431,7 +431,7 @@ public class GraphSPI {
   private void addFriendCounts(Node person, final Map<Node, Integer> counts) {
     // add up friendships for all friends
     final Iterable<Relationship> friendRels = person.getRelationships(Direction.OUTGOING,
-            Neo4jRelTypes.FRIEND_OF);
+            ShindigRelTypes.FRIEND_OF);
 
     Node friend = null;
     Integer count = null;
@@ -450,12 +450,18 @@ public class GraphSPI {
 
   private List<Node> getFriendSuggNodes(String userId, final int number) {
     final Node person = this.fPersonSPI.getPersonNode(userId);
+
+    // return nothing if the person does not exist
+    if (person == null) {
+      return null;
+    }
+
     final Map<Node, Integer> friendCounts = new HashMap<Node, Integer>();
     final List<Entry<Node, Integer>> sortFriends = new ArrayList<Map.Entry<Node, Integer>>();
 
     // add up friendships for all friends of friends
     Iterable<Relationship> friendRels = person.getRelationships(Direction.OUTGOING,
-            Neo4jRelTypes.FRIEND_OF);
+            ShindigRelTypes.FRIEND_OF);
     Node friend = null;
     for (final Relationship rel : friendRels) {
       friend = rel.getEndNode();
@@ -463,7 +469,7 @@ public class GraphSPI {
     }
 
     // remove the people the person is already friends with and self
-    friendRels = person.getRelationships(Direction.OUTGOING, Neo4jRelTypes.FRIEND_OF);
+    friendRels = person.getRelationships(Direction.OUTGOING, ShindigRelTypes.FRIEND_OF);
     for (final Relationship rel : friendRels) {
       friendCounts.remove(rel.getEndNode());
     }
@@ -511,6 +517,11 @@ public class GraphSPI {
       fieldSet.addAll(fields);
     }
     final List<Node> friends = getFriendSuggNodes(userId, number);
+
+    // stop processing if retrieval failed
+    if (friends == null) {
+      return null;
+    }
 
     // filter
     NodeFilter.filterNodes(friends, options);

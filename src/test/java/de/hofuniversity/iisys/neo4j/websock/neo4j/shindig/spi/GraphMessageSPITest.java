@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -35,7 +35,6 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
-import de.hofuniversity.iisys.neo4j.websock.GraphConfig;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.service.IDManager;
 import de.hofuniversity.iisys.neo4j.websock.result.ListResult;
@@ -80,8 +79,10 @@ public class GraphMessageSPITest {
       }
     });
 
-    this.fPersonSPI = new GraphPersonSPI(this.fDb, new GraphConfig(true), new ImplUtil(
-            BasicBSONList.class, BasicBSONObject.class));
+    final Map<String, String> config = new HashMap<String, String>();
+
+    this.fPersonSPI = new GraphPersonSPI(this.fDb, config, new ImplUtil(BasicBSONList.class,
+            BasicBSONObject.class));
     this.fMessageSPI = new GraphMessageSPI(this.fDb, this.fPersonSPI, new IDManager(this.fDb),
             new ImplUtil(BasicBSONList.class, BasicBSONObject.class));
 
@@ -425,7 +426,9 @@ public class GraphMessageSPITest {
     testMsg.put(GraphMessageSPITest.TITLE_FIELD, "testmessage1");
     testMsg.put(GraphMessageSPITest.SENDER_FIELD, GraphMessageSPITest.JANE_ID);
 
-    String[] recipients = { GraphMessageSPITest.HORST_ID };
+    final List<Object> recipients = new BasicBSONList();
+    recipients.add(GraphMessageSPITest.HORST_ID);
+
     testMsg.put(GraphMessageSPITest.RECIPIENTS_FIELD, recipients);
 
     this.fMessageSPI.createMessage(GraphMessageSPITest.JANE_ID, null,
@@ -466,7 +469,7 @@ public class GraphMessageSPITest {
     testMsg.put(GraphMessageSPITest.TITLE_FIELD, "testmessage2");
     testMsg.put(GraphMessageSPITest.SENDER_FIELD, GraphMessageSPITest.JANE_ID);
 
-    recipients = new String[] { GraphMessageSPITest.JOHN_ID };
+    recipients.add(GraphMessageSPITest.JOHN_ID);
     testMsg.put(GraphMessageSPITest.RECIPIENTS_FIELD, recipients);
 
     this.fMessageSPI.createMessage(GraphMessageSPITest.JANE_ID, null,
@@ -486,7 +489,7 @@ public class GraphMessageSPITest {
     }
     Assert.assertTrue(found);
 
-    // check recipient's in box
+    // check first recipient's in box
     messColl = this.fMessageSPI.getMessages(GraphMessageSPITest.JOHN_ID, OSFields.INBOX_NAME, null,
             collOpts, null);
     messages = (List<Map<String, Object>>) messColl.getResults();
@@ -495,6 +498,20 @@ public class GraphMessageSPITest {
     found = false;
     for (final Map<String, Object> m : messages) {
       if (m.get(GraphMessageSPITest.TITLE_FIELD).equals("testmessage2")) {
+        found = true;
+      }
+    }
+    Assert.assertTrue(found);
+
+    // check second recipient's in box
+    messColl = this.fMessageSPI.getMessages(GraphMessageSPITest.HORST_ID, OSFields.INBOX_NAME,
+            null, collOpts, null);
+    messages = (List<Map<String, Object>>) messColl.getResults();
+
+    Assert.assertEquals(4, messages.size());
+    found = false;
+    for (final Map<String, Object> m : messages) {
+      if (m.get(GraphMessageSPITest.TITLE_FIELD).equals("testmessage1")) {
         found = true;
       }
     }
@@ -648,7 +665,7 @@ public class GraphMessageSPITest {
             null, collOpts, null);
     messages = (List<Map<String, Object>>) messColl.getResults();
 
-    Assert.assertEquals(2, messages.size());
+    Assert.assertEquals(3, messages.size());
     found = false;
     for (final Map<String, Object> m : messages) {
       if (m.get(GraphMessageSPITest.TITLE_FIELD).equals("testmessage1")) {

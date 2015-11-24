@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -49,6 +49,8 @@ public class GraphMessageTest {
   private static final String UPDATED_FIELD = "updated";
   private static final String RECIPIENTS_FIELD = "recipients";
   private static final String URLS_FIELD = "urls";
+  private static final String URL_TYPES_FIELD = "urls_types";
+  private static final String URL_TEXTS_FIELD = "urls_linkTexts";
   private static final String STATUS_FIELD = "status";
   private static final String COLL_IDS_FIELD = "collectionIds";
   private static final String REPLIES_FIELD = "replies";
@@ -66,6 +68,8 @@ public class GraphMessageTest {
   private static final Long UPDATED = System.currentTimeMillis();
   private static final String[] RECIPIENTS = { "ID1", "ID2", "ID3" };
   private static final String[] URLS = { "URL1", "URL2", "URL3" };
+  private static final String[] URL_TEXTS = { "TEXT1", "TEXT2", "TEXT3" };
+  private static final String[] URL_TYPES = { "TYPE1", "TYPE2", "TYPE3" };
 
   private static final String COLL1_ID = "collection 1", COLL2_ID = "collection 2";
   private static final String STATUS = "NEW";
@@ -114,7 +118,10 @@ public class GraphMessageTest {
     this.fMessageNode.setProperty(GraphMessageTest.TIME_FIELD, GraphMessageTest.TIME);
     this.fMessageNode.setProperty(GraphMessageTest.UPDATED_FIELD, GraphMessageTest.UPDATED);
     this.fMessageNode.setProperty(GraphMessageTest.RECIPIENTS_FIELD, GraphMessageTest.RECIPIENTS);
+
     this.fMessageNode.setProperty(GraphMessageTest.URLS_FIELD, GraphMessageTest.URLS);
+    this.fMessageNode.setProperty(GraphMessageTest.URL_TYPES_FIELD, GraphMessageTest.URL_TYPES);
+    this.fMessageNode.setProperty(GraphMessageTest.URL_TEXTS_FIELD, GraphMessageTest.URL_TEXTS);
 
     // user
     final Node userNode = this.fDb.createNode();
@@ -169,8 +176,14 @@ public class GraphMessageTest {
     final String[] recipients = (String[]) m.get(GraphMessageTest.RECIPIENTS_FIELD);
     Assert.assertArrayEquals(GraphMessageTest.RECIPIENTS, recipients);
 
-    final String[] urls = (String[]) m.get(GraphMessageTest.URLS_FIELD);
+    String[] urls = (String[]) m.get(GraphMessageTest.URLS_FIELD);
     Assert.assertArrayEquals(GraphMessageTest.URLS, urls);
+
+    urls = (String[]) m.get(GraphMessageTest.URL_TYPES_FIELD);
+    Assert.assertTrue(Arrays.equals(urls, GraphMessageTest.URL_TYPES));
+
+    urls = (String[]) m.get(GraphMessageTest.URL_TEXTS_FIELD);
+    Assert.assertTrue(Arrays.equals(urls, GraphMessageTest.URL_TEXTS));
 
     final String[] colls = (String[]) m.get(GraphMessageTest.COLL_IDS_FIELD);
     Assert.assertEquals(GraphMessageTest.COLL1_ID, colls[0]);
@@ -217,7 +230,13 @@ public class GraphMessageTest {
     final String[] recipients = (String[]) newMess.getProperty(GraphMessageTest.RECIPIENTS_FIELD);
     Assert.assertTrue(Arrays.equals(recipients, GraphMessageTest.RECIPIENTS));
 
-    final String[] urls = (String[]) newMess.getProperty(GraphMessageTest.URLS_FIELD);
+    String[] urls = (String[]) newMess.getProperty(GraphMessageTest.URLS_FIELD);
     Assert.assertTrue(Arrays.equals(urls, GraphMessageTest.URLS));
+
+    urls = (String[]) newMess.getProperty(GraphMessageTest.URL_TYPES_FIELD);
+    Assert.assertTrue(Arrays.equals(urls, GraphMessageTest.URL_TYPES));
+
+    urls = (String[]) newMess.getProperty(GraphMessageTest.URL_TEXTS_FIELD);
+    Assert.assertTrue(Arrays.equals(urls, GraphMessageTest.URL_TEXTS));
   }
 }

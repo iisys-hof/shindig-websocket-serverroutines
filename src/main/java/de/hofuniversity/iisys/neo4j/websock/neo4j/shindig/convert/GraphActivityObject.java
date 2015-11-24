@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -30,10 +30,10 @@ import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.ConvHelper;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.IGraphObject;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.SimpleGraphObject;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
@@ -143,7 +143,7 @@ public class GraphActivityObject implements IGraphObject {
   private void copyAttachments(final Map<String, Object> dto) {
     final List<Map<String, Object>> attachments = this.fImpl.newList();
     final Iterable<Relationship> attRels = this.fNode.getRelationships(Direction.OUTGOING,
-            Neo4jRelTypes.ATTACHED);
+            ShindigRelTypes.ATTACHED);
 
     // TODO: wrapper for people?
 
@@ -161,7 +161,7 @@ public class GraphActivityObject implements IGraphObject {
   }
 
   private void copyAuthor(final Map<String, Object> dto) {
-    final Relationship authRel = this.fNode.getSingleRelationship(Neo4jRelTypes.AUTHOR,
+    final Relationship authRel = this.fNode.getSingleRelationship(ShindigRelTypes.AUTHOR,
             Direction.OUTGOING);
 
     // TODO: wrapper for people?
@@ -174,7 +174,7 @@ public class GraphActivityObject implements IGraphObject {
   }
 
   private void copyImage(final Map<String, Object> dto) {
-    final Relationship imgRel = this.fNode.getSingleRelationship(Neo4jRelTypes.HAS_ICON,
+    final Relationship imgRel = this.fNode.getSingleRelationship(ShindigRelTypes.HAS_ICON,
             Direction.OUTGOING);
 
     if (imgRel != null) {

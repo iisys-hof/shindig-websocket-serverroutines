@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -29,10 +29,10 @@ import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.ConvHelper;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.IGraphObject;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.SimpleGraphObject;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
@@ -165,7 +165,7 @@ public class GraphActivityEntry implements IGraphObject {
   }
 
   private void copyActor(Map<String, Object> dto) {
-    final Relationship actRel = this.fNode.getSingleRelationship(Neo4jRelTypes.ACTOR,
+    final Relationship actRel = this.fNode.getSingleRelationship(ShindigRelTypes.ACTOR,
             Direction.OUTGOING);
 
     if (actRel != null) {
@@ -177,7 +177,7 @@ public class GraphActivityEntry implements IGraphObject {
   }
 
   private void copyGenerator(Map<String, Object> dto) {
-    final Relationship genRel = this.fNode.getSingleRelationship(Neo4jRelTypes.GENERATOR,
+    final Relationship genRel = this.fNode.getSingleRelationship(ShindigRelTypes.GENERATOR,
             Direction.OUTGOING);
 
     if (genRel != null) {
@@ -189,7 +189,7 @@ public class GraphActivityEntry implements IGraphObject {
   }
 
   private void copyObject(Map<String, Object> dto) {
-    final Relationship objRel = this.fNode.getSingleRelationship(Neo4jRelTypes.OBJECT,
+    final Relationship objRel = this.fNode.getSingleRelationship(ShindigRelTypes.OBJECT,
             Direction.OUTGOING);
 
     if (objRel != null) {
@@ -201,7 +201,7 @@ public class GraphActivityEntry implements IGraphObject {
   }
 
   private void copyProvider(Map<String, Object> dto) {
-    final Relationship provRel = this.fNode.getSingleRelationship(Neo4jRelTypes.PROVIDER,
+    final Relationship provRel = this.fNode.getSingleRelationship(ShindigRelTypes.PROVIDER,
             Direction.OUTGOING);
 
     if (provRel != null) {
@@ -213,7 +213,7 @@ public class GraphActivityEntry implements IGraphObject {
   }
 
   private void copyTarget(Map<String, Object> dto) {
-    final Relationship tarRel = this.fNode.getSingleRelationship(Neo4jRelTypes.TARGET,
+    final Relationship tarRel = this.fNode.getSingleRelationship(ShindigRelTypes.TARGET,
             Direction.OUTGOING);
 
     if (tarRel != null) {
@@ -225,7 +225,7 @@ public class GraphActivityEntry implements IGraphObject {
   }
 
   private void copyIcon(Map<String, Object> dto) {
-    final Relationship iconRel = this.fNode.getSingleRelationship(Neo4jRelTypes.HAS_ICON,
+    final Relationship iconRel = this.fNode.getSingleRelationship(ShindigRelTypes.HAS_ICON,
             Direction.OUTGOING);
 
     if (iconRel != null) {

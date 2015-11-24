@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -28,9 +28,9 @@ import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.IGraphObject;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.SimpleGraphObject;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
@@ -102,7 +102,7 @@ public class GraphMediaItem implements IGraphObject {
   }
 
   private void copyLocation(final Map<String, Object> dto) {
-    final Relationship locRel = this.fNode.getSingleRelationship(Neo4jRelTypes.LOCATED_AT,
+    final Relationship locRel = this.fNode.getSingleRelationship(ShindigRelTypes.LOCATED_AT,
             Direction.OUTGOING);
 
     if (locRel != null) {
@@ -136,7 +136,7 @@ public class GraphMediaItem implements IGraphObject {
 
     if (locMap != null) {
       Node addNode = null;
-      final Relationship locRel = this.fNode.getSingleRelationship(Neo4jRelTypes.LOCATED_AT,
+      final Relationship locRel = this.fNode.getSingleRelationship(ShindigRelTypes.LOCATED_AT,
               Direction.OUTGOING);
 
       if (locRel != null) {

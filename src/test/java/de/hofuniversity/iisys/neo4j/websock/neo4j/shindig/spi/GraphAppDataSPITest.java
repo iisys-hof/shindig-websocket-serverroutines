@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -36,7 +36,6 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
-import de.hofuniversity.iisys.neo4j.websock.GraphConfig;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.result.SingleResult;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
@@ -77,8 +76,10 @@ public class GraphAppDataSPITest {
       }
     });
 
-    this.fPersonSPI = new GraphPersonSPI(this.fDb, new GraphConfig(true), new ImplUtil(
-            BasicBSONList.class, BasicBSONObject.class));
+    final Map<String, String> config = new HashMap<String, String>();
+
+    this.fPersonSPI = new GraphPersonSPI(this.fDb, config, new ImplUtil(BasicBSONList.class,
+            BasicBSONObject.class));
     this.fApplications = new ApplicationService(this.fDb);
     this.fAppDataSPI = new GraphAppDataSPI(this.fDb, this.fPersonSPI, this.fApplications,
             new ImplUtil(BasicBSONList.class, BasicBSONObject.class));

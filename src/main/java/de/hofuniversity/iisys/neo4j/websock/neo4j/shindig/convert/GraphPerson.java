@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -20,7 +20,6 @@ package de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,10 +35,10 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.ConvHelper;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.IGraphObject;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.SimpleGraphObject;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
@@ -359,7 +358,7 @@ public class GraphPerson implements IGraphObject {
   private void copyAccounts(final Map<String, Object> dto) {
     final List<Map<String, Object>> accounts = this.fImpl.newList();
 
-    final Iterable<Relationship> accs = this.fNode.getRelationships(Neo4jRelTypes.ACCOUNT);
+    final Iterable<Relationship> accs = this.fNode.getRelationships(ShindigRelTypes.ACCOUNT);
 
     SimpleGraphObject gAcc = null;
     Map<String, Object> tmpAcc = null;
@@ -377,7 +376,7 @@ public class GraphPerson implements IGraphObject {
   private void copyAddresses(final Map<String, Object> dto) {
     final List<Map<String, Object>> addresses = this.fImpl.newList();
 
-    final Iterable<Relationship> locs = this.fNode.getRelationships(Neo4jRelTypes.LOCATED_AT);
+    final Iterable<Relationship> locs = this.fNode.getRelationships(ShindigRelTypes.LOCATED_AT);
 
     Node add = null;
     Map<String, Object> tmpAdd = null;
@@ -393,7 +392,7 @@ public class GraphPerson implements IGraphObject {
   }
 
   private void copyAppData(final Map<String, Object> dto) {
-    final Iterable<Relationship> dataRels = this.fNode.getRelationships(Neo4jRelTypes.HAS_DATA);
+    final Iterable<Relationship> dataRels = this.fNode.getRelationships(ShindigRelTypes.HAS_DATA);
     final Iterator<Relationship> dataIter = dataRels.iterator();
 
     // TODO: check
@@ -411,7 +410,7 @@ public class GraphPerson implements IGraphObject {
   }
 
   private void copyLocation(final Map<String, Object> dto) {
-    final Relationship locRel = this.fNode.getSingleRelationship(Neo4jRelTypes.CURRENTLY_AT,
+    final Relationship locRel = this.fNode.getSingleRelationship(ShindigRelTypes.CURRENTLY_AT,
             Direction.OUTGOING);
 
     if (locRel != null) {
@@ -424,16 +423,10 @@ public class GraphPerson implements IGraphObject {
   private void copyOrganizations(final Map<String, Object> dto) {
     final List<Map<String, Object>> organizations = this.fImpl.newList();
 
-    final Iterable<Relationship> orgs = this.fNode.getRelationships(Neo4jRelTypes.AFFILIATED);
+    // having multiple organizations is not supported at the moment
 
-    Node org = null;
-    Map<String, Object> tmpOrg = null;
-
-    for (final Relationship rel : orgs) {
-      org = rel.getEndNode();
-      tmpOrg = new GraphOrganization(org, rel, this.fImpl).toMap(null);
-      organizations.add(tmpOrg);
-    }
+    final Map<String, Object> tmpOrg = new GraphOrganization(this.fNode, this.fImpl).toMap(null);
+    organizations.add(tmpOrg);
 
     if (!organizations.isEmpty()) {
       dto.put(GraphPerson.ORGS_FIELD, organizations);
@@ -441,7 +434,7 @@ public class GraphPerson implements IGraphObject {
   }
 
   private void copyEmails(final Map<String, Object> dto) {
-    final Relationship emailRel = this.fNode.getSingleRelationship(Neo4jRelTypes.EMAILS,
+    final Relationship emailRel = this.fNode.getSingleRelationship(ShindigRelTypes.EMAILS,
             Direction.OUTGOING);
 
     if (emailRel != null) {
@@ -453,7 +446,7 @@ public class GraphPerson implements IGraphObject {
   }
 
   private void copyIms(final Map<String, Object> dto) {
-    final Relationship imRel = this.fNode.getSingleRelationship(Neo4jRelTypes.IMS,
+    final Relationship imRel = this.fNode.getSingleRelationship(ShindigRelTypes.IMS,
             Direction.OUTGOING);
 
     if (imRel != null) {
@@ -465,7 +458,7 @@ public class GraphPerson implements IGraphObject {
   }
 
   private void copyPhones(final Map<String, Object> dto) {
-    final Relationship phoneRel = this.fNode.getSingleRelationship(Neo4jRelTypes.PHONE_NUMS,
+    final Relationship phoneRel = this.fNode.getSingleRelationship(ShindigRelTypes.PHONE_NUMS,
             Direction.OUTGOING);
 
     if (phoneRel != null) {
@@ -477,7 +470,7 @@ public class GraphPerson implements IGraphObject {
   }
 
   private void copyPhotos(final Map<String, Object> dto) {
-    final Relationship photoRel = this.fNode.getSingleRelationship(Neo4jRelTypes.PHOTOS,
+    final Relationship photoRel = this.fNode.getSingleRelationship(ShindigRelTypes.PHOTOS,
             Direction.OUTGOING);
 
     if (photoRel != null) {
@@ -668,22 +661,22 @@ public class GraphPerson implements IGraphObject {
 
     final Map<String, Object> emails = (Map<String, Object>) person.get(GraphPerson.EMAILS_FIELD);
     if (emails != null) {
-      updateListField(emails, Neo4jRelTypes.EMAILS);
+      updateListField(emails, ShindigRelTypes.EMAILS);
     }
 
     final Map<String, Object> ims = (Map<String, Object>) person.get(GraphPerson.IMS_FIELD);
     if (ims != null) {
-      updateListField(emails, Neo4jRelTypes.IMS);
+      updateListField(emails, ShindigRelTypes.IMS);
     }
 
     final Map<String, Object> phones = (Map<String, Object>) person.get(GraphPerson.PHONES_FIELD);
     if (phones != null) {
-      updateListField(phones, Neo4jRelTypes.PHONE_NUMS);
+      updateListField(phones, ShindigRelTypes.PHONE_NUMS);
     }
 
     final Map<String, Object> photos = (Map<String, Object>) person.get(GraphPerson.PHOTOS_FIELD);
     if (photos != null) {
-      updateListField(photos, Neo4jRelTypes.PHOTOS);
+      updateListField(photos, ShindigRelTypes.PHOTOS);
     }
   }
 
@@ -691,7 +684,7 @@ public class GraphPerson implements IGraphObject {
     // TODO: maybe actually only update differences (requires full scan)
 
     Node addNode = null;
-    for (final Relationship rel : this.fNode.getRelationships(Neo4jRelTypes.LOCATED_AT)) {
+    for (final Relationship rel : this.fNode.getRelationships(ShindigRelTypes.LOCATED_AT)) {
       addNode = rel.getEndNode();
       rel.delete();
 
@@ -704,7 +697,7 @@ public class GraphPerson implements IGraphObject {
     final GraphDatabaseService db = this.fNode.getGraphDatabase();
     for (final Map<String, Object> add : addresses) {
       addNode = db.createNode();
-      this.fNode.createRelationshipTo(addNode, Neo4jRelTypes.LOCATED_AT);
+      this.fNode.createRelationshipTo(addNode, ShindigRelTypes.LOCATED_AT);
 
       // store attributes
       new SimpleGraphObject(addNode, this.fImpl).setData(add);
@@ -717,7 +710,7 @@ public class GraphPerson implements IGraphObject {
 
   private void updateLocation(Map<String, Object> location) {
     Node locNode = null;
-    final Relationship rel = this.fNode.getSingleRelationship(Neo4jRelTypes.CURRENTLY_AT,
+    final Relationship rel = this.fNode.getSingleRelationship(ShindigRelTypes.CURRENTLY_AT,
             Direction.OUTGOING);
 
     if (rel != null) {
@@ -731,43 +724,24 @@ public class GraphPerson implements IGraphObject {
     }
 
     locNode = this.fNode.getGraphDatabase().createNode();
-    this.fNode.createRelationshipTo(locNode, Neo4jRelTypes.CURRENTLY_AT);
+    this.fNode.createRelationshipTo(locNode, ShindigRelTypes.CURRENTLY_AT);
 
     // store attributes
     new SimpleGraphObject(locNode, this.fImpl).setData(location);
   }
 
   private void updateOrganizations(List<Map<String, Object>> organizations) {
-    // TODO: maybe actually only update differences (requires full scan)
-    // TODO: alternative: only reuse nodes and relationships
-
-    Node orgNode = null;
-    for (final Relationship rel : this.fNode.getRelationships(Neo4jRelTypes.AFFILIATED)) {
-      orgNode = rel.getEndNode();
-      rel.delete();
-
-      // delete unused organizations
-      if (!orgNode.hasRelationship()) {
-        orgNode.delete();
-      }
-    }
-
-    Relationship affRel = null;
-    final GraphDatabaseService db = this.fNode.getGraphDatabase();
-
-    // TODO: figure out where order is actually reversed
-    Collections.reverse(organizations);
+    // storing multiple organizations is not possible at the moment
 
     for (final Map<String, Object> org : organizations) {
-      orgNode = db.createNode();
-      affRel = this.fNode.createRelationshipTo(orgNode, Neo4jRelTypes.AFFILIATED);
-
       // store attributes
-      new GraphOrganization(orgNode, affRel, this.fImpl).setData(org);
+      new GraphOrganization(this.fNode, this.fImpl).setData(org);
+      // only one organization is supported at the moment
+      break;
     }
   }
 
-  private void updateListField(Map<String, Object> list, Neo4jRelTypes type) {
+  private void updateListField(Map<String, Object> list, ShindigRelTypes type) {
     Node listNode = null;
     final Relationship listRel = this.fNode.getSingleRelationship(type, Direction.OUTGOING);
 

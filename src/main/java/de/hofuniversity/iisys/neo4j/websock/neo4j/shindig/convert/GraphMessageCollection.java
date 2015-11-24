@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -30,9 +30,9 @@ import java.util.Set;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.ConvHelper;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.IGraphObject;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
@@ -129,7 +129,7 @@ public class GraphMessageCollection implements IGraphObject {
 
   private void copyTotal(Map<String, Object> dto) {
     // counts how many "contained" relations the node has
-    final Iterable<Relationship> contained = this.fNode.getRelationships(Neo4jRelTypes.CONTAINS);
+    final Iterable<Relationship> contained = this.fNode.getRelationships(ShindigRelTypes.CONTAINS);
     final Iterator<Relationship> conRels = contained.iterator();
     Integer total = 0;
 
@@ -147,7 +147,7 @@ public class GraphMessageCollection implements IGraphObject {
 
   private void copyUnread(Map<String, Object> dto) {
     // check all "contained"-relations for an "unread" status
-    final Iterable<Relationship> contained = this.fNode.getRelationships(Neo4jRelTypes.CONTAINS);
+    final Iterable<Relationship> contained = this.fNode.getRelationships(ShindigRelTypes.CONTAINS);
     Integer unread = 0;
 
     for (final Relationship rel : contained) {

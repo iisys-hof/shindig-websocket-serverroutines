@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -31,9 +31,9 @@ import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.ConvHelper;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.IGraphObject;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
@@ -59,6 +59,8 @@ public class GraphMessage implements IGraphObject {
   private static final String UPDATED_FIELD = "updated";
   private static final String RECIPIENTS_FIELD = "recipients";
   private static final String URLS_FIELD = "urls";
+  private static final String URL_TYPES_FIELD = "urls_types";
+  private static final String URL_TEXTS_FIELD = "urls_linkTexts";
 
   private static final ConvHelper HELPER = createHelper();
 
@@ -68,12 +70,18 @@ public class GraphMessage implements IGraphObject {
   private final ImplUtil fImpl;
 
   private static ConvHelper createHelper() {
+    final Map<String, List<String>> splitFields = new HashMap<String, List<String>>();
+    final List<String> splitUrl = new ArrayList<String>();
+    splitUrl.add(GraphMessage.URL_TYPES_FIELD);
+    splitUrl.add(GraphMessage.URL_TEXTS_FIELD);
+    splitFields.put(GraphMessage.URLS_FIELD, splitUrl);
+
     final Set<String> relMapped = new HashSet<String>();
     relMapped.add(GraphMessage.COLL_IDS_FIELD);
     relMapped.add(GraphMessage.REPLIES_FIELD);
     relMapped.add(GraphMessage.STATUS_FIELD);
 
-    return new ConvHelper(null, relMapped, null);
+    return new ConvHelper(splitFields, relMapped, null);
   }
 
   /**
@@ -120,6 +128,7 @@ public class GraphMessage implements IGraphObject {
 
       copyAllRelMapped(dto);
     } else {
+      copySplitFields(dto, fields);
       copyRelMapped(dto, fields);
 
       final Set<String> newProps = new HashSet<String>(fields);
@@ -134,6 +143,20 @@ public class GraphMessage implements IGraphObject {
     }
 
     return dto;
+  }
+
+  private void copySplitFields(final Map<String, Object> dto, final Set<String> properties) {
+    for (final String prop : properties) {
+      final List<String> subProps = GraphMessage.HELPER.getSplitFields().get(prop);
+
+      if (subProps != null) {
+        for (final String subProp : subProps) {
+          if (this.fNode.hasProperty(subProp)) {
+            dto.put(prop, this.fNode.getProperty(subProp));
+          }
+        }
+      }
+    }
   }
 
   private void copyRelMapped(final Map<String, Object> dto, final Set<String> properties) {
@@ -168,13 +191,13 @@ public class GraphMessage implements IGraphObject {
     if (this.fStatusRel != null) {
       final Node coll = this.fStatusRel.getStartNode();
       if (coll != null) {
-        final Relationship userRel = coll.getSingleRelationship(Neo4jRelTypes.OWNS,
+        final Relationship userRel = coll.getSingleRelationship(ShindigRelTypes.OWNS,
                 Direction.INCOMING);
 
         if (userRel != null) {
           final Node user = userRel.getStartNode();
 
-          final Iterable<Relationship> collRels = user.getRelationships(Neo4jRelTypes.OWNS,
+          final Iterable<Relationship> collRels = user.getRelationships(ShindigRelTypes.OWNS,
                   Direction.OUTGOING);
           for (final Relationship rel : collRels) {
             collNodes.add(rel.getEndNode());
@@ -184,7 +207,8 @@ public class GraphMessage implements IGraphObject {
     }
 
     // filter all "contained in" relationships
-    final Iterable<Relationship> containedIns = this.fNode.getRelationships(Neo4jRelTypes.CONTAINS);
+    final Iterable<Relationship> containedIns = this.fNode
+            .getRelationships(ShindigRelTypes.CONTAINS);
 
     Node collection = null;
     String collId = null;
@@ -207,7 +231,7 @@ public class GraphMessage implements IGraphObject {
     // get the IDs of all messages linked to this one as their parent
     final List<String> replies = new ArrayList<String>();
 
-    final Iterable<Relationship> replyRels = this.fNode.getRelationships(Neo4jRelTypes.REPLY_TO,
+    final Iterable<Relationship> replyRels = this.fNode.getRelationships(ShindigRelTypes.REPLY_TO,
             Direction.INCOMING);
 
     Node replyNode = null;
@@ -270,6 +294,19 @@ public class GraphMessage implements IGraphObject {
       newValues.put(GraphMessage.RECIPIENTS_FIELD, recipients);
     }
 
+    handleUrls(message, newValues);
+
+    // set new values
+    for (final Entry<String, Object> valE : newValues.entrySet()) {
+      if (valE.getValue() != null) {
+        this.fNode.setProperty(valE.getKey(), valE.getValue());
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private void handleUrls(final Map<String, ?> message, Map<String, Object> newValues) {
+    // url values
     final Object urlVal = message.get(GraphMessage.URLS_FIELD);
     if (urlVal != null) {
       String[] urls = null;
@@ -281,15 +318,70 @@ public class GraphMessage implements IGraphObject {
         urls = urlList.toArray(new String[urlList.size()]);
       }
 
+      // replace null values
+      for (int i = 0; i < urls.length; ++i) {
+        if (urls[i] == null) {
+          urls[i] = "";
+        }
+
+        if (urls[i] == null) {
+          urls[i] = "";
+        }
+      }
+
       newValues.put(GraphMessage.URLS_FIELD, urls);
     }
 
-    // set new values
-    for (final Entry<String, Object> valE : newValues.entrySet()) {
-      if (valE.getValue() != null) {
-        this.fNode.setProperty(valE.getKey(), valE.getValue());
+    // url types
+    final Object urlTypes = message.get(GraphMessage.URL_TYPES_FIELD);
+    if (urlTypes != null) {
+      String[] urls = null;
+
+      if (urlTypes instanceof String[]) {
+        urls = (String[]) urlTypes;
+      } else {
+        final List<String> urlList = (List<String>) urlTypes;
+        urls = urlList.toArray(new String[urlList.size()]);
       }
+
+      // replace null values
+      for (int i = 0; i < urls.length; ++i) {
+        if (urls[i] == null) {
+          urls[i] = "";
+        }
+
+        if (urls[i] == null) {
+          urls[i] = "";
+        }
+      }
+
+      newValues.put(GraphMessage.URL_TYPES_FIELD, urls);
+    }
+
+    // url link texts
+    final Object urlTexts = message.get(GraphMessage.URL_TEXTS_FIELD);
+    if (urlTexts != null) {
+      String[] urls = null;
+
+      if (urlTexts instanceof String[]) {
+        urls = (String[]) urlTexts;
+      } else {
+        final List<String> urlList = (List<String>) urlTexts;
+        urls = urlList.toArray(new String[urlList.size()]);
+      }
+
+      // replace null values
+      for (int i = 0; i < urls.length; ++i) {
+        if (urls[i] == null) {
+          urls[i] = "";
+        }
+
+        if (urls[i] == null) {
+          urls[i] = "";
+        }
+      }
+
+      newValues.put(GraphMessage.URL_TEXTS_FIELD, urls);
     }
   }
-
 }

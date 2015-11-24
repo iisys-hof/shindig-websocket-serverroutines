@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -26,7 +26,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 
-import de.hofuniversity.iisys.neo4j.websock.GraphConfig;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.service.IDManager;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert.GraphActivityObject;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
@@ -39,6 +39,8 @@ import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 public class ActivityObjectService {
   private final GraphDatabaseService fDatabase;
   private final Index<Node> fPersonNodes;
+
+  private final IDManager fIdMan;
 
   private final ImplUtil fImpl;
 
@@ -56,19 +58,23 @@ public class ActivityObjectService {
    * @param impl
    *          implementation utility to use
    */
-  public ActivityObjectService(GraphDatabaseService database, GraphConfig config, ImplUtil impl) {
+  public ActivityObjectService(GraphDatabaseService database, Map<String, String> config,
+          IDManager idMan, ImplUtil impl) {
     if (database == null) {
       throw new NullPointerException("database service was null");
     }
     if (config == null) {
       throw new NullPointerException("configuration object was null");
     }
+    if (idMan == null) {
+      throw new NullPointerException("ID manager was null");
+    }
     if (impl == null) {
       throw new NullPointerException("implementation utility was null");
     }
 
-    final String dedup = config.getProperty(ShindigConstants.ACT_OBJ_DEDUP_PROP);
-    final String update = config.getProperty(ShindigConstants.ACT_OBJ_UPDATE_PROP);
+    final String dedup = config.get(ShindigConstants.ACT_OBJ_DEDUP_PROP);
+    final String update = config.get(ShindigConstants.ACT_OBJ_UPDATE_PROP);
 
     if (dedup != null) {
       this.fDedupObjects = Boolean.parseBoolean(dedup);
@@ -84,6 +90,8 @@ public class ActivityObjectService {
 
     this.fDatabase = database;
     this.fPersonNodes = this.fDatabase.index().forNodes(ShindigConstants.PERSON_NODES);
+
+    this.fIdMan = idMan;
 
     this.fImpl = impl;
   }
@@ -117,11 +125,14 @@ public class ActivityObjectService {
 
     // add suffix to avoid collisions
     final String type = object.get(OSFields.OBJECT_TYPE) + ShindigConstants.ACT_OBJ_TYPE_SUFF;
-    final String id = (String) object.get(OSFields.ID_FIELD);
+    String id = (String) object.get(OSFields.ID_FIELD);
 
     if (ShindigConstants.PERSON_NODES.equals(object.get(OSFields.OBJECT_TYPE))) {
       // return person nodes for people
       node = this.fPersonNodes.get(OSFields.ID_FIELD, id).getSingle();
+    } else if (id == null) {
+      // generate ID if there is none
+      id = this.fIdMan.genID(type);
     }
 
     /*
@@ -162,26 +173,36 @@ public class ActivityObjectService {
 
     final Transaction tx = this.fDatabase.beginTx();
 
-    for (final Node object : objects) {
-      type = (String) object.getProperty(OSFields.OBJECT_TYPE, null);
+    try {
 
-      // people should be the only objects that do not have types
-      // TODO: additional types?
-      if (type == null) {
-        continue;
+      for (final Node object : objects) {
+        type = (String) object.getProperty(OSFields.OBJECT_TYPE, null);
+
+        // people should be the only objects that do not have types
+        // TODO: additional types?
+        if (type == null) {
+          continue;
+        }
+
+        if (!object.hasRelationship()) {
+          type += ShindigConstants.ACT_OBJ_TYPE_SUFF;
+          index = this.fDatabase.index().forNodes(type);
+
+          index.remove(object);
+
+          object.delete();
+        }
       }
 
-      if (!object.hasRelationship()) {
-        type += ShindigConstants.ACT_OBJ_TYPE_SUFF;
-        index = this.fDatabase.index().forNodes(type);
+      tx.success();
+      tx.finish();
+    } catch (final Exception e) {
+      e.printStackTrace();
 
-        index.remove(object);
+      tx.failure();
+      tx.finish();
 
-        object.delete();
-      }
+      throw new RuntimeException(e);
     }
-
-    tx.success();
-    tx.finish();
   }
 }

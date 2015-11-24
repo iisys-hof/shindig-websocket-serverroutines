@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -550,7 +550,7 @@ public class GraphMessageSPI {
    * @param message
    *          message data to use
    */
-  public void createMessage(String userId, String appId, String msgCollId,
+  public SingleResult createMessage(String userId, String appId, String msgCollId,
           Map<String, Object> message) {
 
     final Transaction tx = this.fDatabase.beginTx();
@@ -563,7 +563,12 @@ public class GraphMessageSPI {
       message.put(GraphMessageSPI.ID_FIELD, id);
 
       final Long time = System.currentTimeMillis();
-      message.put(GraphMessageSPI.TIME_SENT_FIELD, time);
+
+      // only add sent time if message will actually be sent
+      if (msgCollId.equals(GraphMessageSPI.OUTBOX_NAME)) {
+        message.put(GraphMessageSPI.TIME_SENT_FIELD, time);
+      }
+
       message.put(GraphMessageSPI.UPDATED_FIELD, time);
 
       new GraphMessage(msgNode, null).setData(message);
@@ -578,20 +583,24 @@ public class GraphMessageSPI {
       if (OSFields.INBOX_NAME.equals(msgCollId)) {
         throw new RuntimeException("messages can not be added to the inbox manually");
       }
+
       final Node coll = getCollection(userId, msgCollId);
-
-      sender.createRelationshipTo(msgNode, Neo4jRelTypes.SENT);
-      coll.createRelationshipTo(msgNode, Neo4jRelTypes.CONTAINS);
-
-      // check for reply status and link
-      final String repTo = (String) message.get(GraphMessageSPI.IN_REPLY_TO_FIELD);
-      if (repTo != null && !repTo.isEmpty()) {
-        addReply(repTo, msgNode);
+      if (coll == null) {
+        throw new RuntimeException("collection '" + msgCollId + "' for user '" + userId
+                + "' not found");
       }
+      coll.createRelationshipTo(msgNode, Neo4jRelTypes.CONTAINS);
 
       // send to recipients (link and put in in box)
       if (msgCollId.equals(GraphMessageSPI.OUTBOX_NAME)) {
+        sender.createRelationshipTo(msgNode, Neo4jRelTypes.SENT);
         send(message, msgNode);
+
+        // check for reply status and link
+        final String repTo = (String) message.get(GraphMessageSPI.IN_REPLY_TO_FIELD);
+        if (repTo != null && !repTo.isEmpty()) {
+          addReply(repTo, msgNode);
+        }
       }
 
       tx.success();
@@ -602,15 +611,18 @@ public class GraphMessageSPI {
 
       throw e;
     }
+
+    return new SingleResult(message);
   }
 
   private void send(final Map<String, Object> message, final Node msgNode) {
-    final String[] recipients = (String[]) message.get(GraphMessageSPI.RECIPIENTS_FIELD);
+    @SuppressWarnings("unchecked")
+    final List<String> recipients = (List<String>) message.get(GraphMessageSPI.RECIPIENTS_FIELD);
     Node recNode = null;
     Node collNode = null;
     Relationship conRel = null;
 
-    if (recipients == null || recipients.length == 0) {
+    if (recipients == null || recipients.isEmpty()) {
       throw new RuntimeException("no recipients to send to");
     }
 
@@ -640,12 +652,8 @@ public class GraphMessageSPI {
         // TODO: also delete SENT or SENT_TO?
 
         // check if anybody still has this message, delete otherwise
-        if (message.hasRelationship(Neo4jRelTypes.CONTAINS, Direction.INCOMING)) {
-          this.fMessageNodes.remove(message);
-          for (final Relationship rel : message.getRelationships()) {
-            rel.delete();
-          }
-          message.delete();
+        if (!message.hasRelationship(Neo4jRelTypes.CONTAINS, Direction.INCOMING)) {
+          deleteCompletely(message);
         }
 
         // break if all were deleted
@@ -654,6 +662,14 @@ public class GraphMessageSPI {
         }
       }
     }
+  }
+
+  private void deleteCompletely(Node message) {
+    this.fMessageNodes.remove(message);
+    for (final Relationship rel : message.getRelationships()) {
+      rel.delete();
+    }
+    message.delete();
   }
 
   /**

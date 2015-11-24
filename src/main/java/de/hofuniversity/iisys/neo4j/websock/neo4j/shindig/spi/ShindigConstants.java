@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -33,6 +33,9 @@ public class ShindigConstants {
   public static final String MESSAGE_NODES = "messages";
   public static final String GROUP_NODES = "groups";
   public static final String ID_NODE = "id";
+  public static final String SKILL_NODES = "skills";
+  public static final String ORG_UNIT_NODES = "orgunits";
+  public static final String ORG_NODE = "organization";
 
   // other
   public static final String PERSON_TYPE = "person";

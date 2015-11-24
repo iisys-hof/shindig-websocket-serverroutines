@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -29,7 +29,6 @@ import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
-import de.hofuniversity.iisys.neo4j.websock.GraphConfig;
 import de.hofuniversity.iisys.neo4j.websock.calls.IStoredProcedure;
 import de.hofuniversity.iisys.neo4j.websock.shindig.ShindigNativeQueries;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
@@ -61,9 +60,8 @@ public class ShindigNativeProceduresTest {
       }
     });
 
-    final GraphConfig config = new GraphConfig(true);
-    this.fProcedures = new ShindigNativeProcedures(config, this.fService, new ImplUtil(
-            BasicBSONList.class, BasicBSONObject.class)).getProcedures();
+    this.fProcedures = new ShindigNativeProcedures(this.fService, new ImplUtil(BasicBSONList.class,
+            BasicBSONObject.class)).getProcedures();
   }
 
   @After
@@ -273,5 +271,25 @@ public class ShindigNativeProceduresTest {
     proc = this.fProcedures.get(ShindigNativeQueries.UPDATE_MEDIA_ITEM_QUERY);
     Assert.assertNotNull(proc);
     Assert.assertEquals(ShindigNativeQueries.UPDATE_MEDIA_ITEM_METHOD, proc.getName());
+  }
+
+  @Test
+  public void testSkillService() {
+    IStoredProcedure proc = this.fProcedures
+            .get(ShindigNativeQueries.GET_SKILL_AUTOCOMPLETION_QUERY);
+    Assert.assertNotNull(proc);
+    Assert.assertEquals(ShindigNativeQueries.GET_SKILL_AUTOCOMPLETION_METHOD, proc.getName());
+
+    proc = this.fProcedures.get(ShindigNativeQueries.GET_SKILLS_QUERY);
+    Assert.assertNotNull(proc);
+    Assert.assertEquals(ShindigNativeQueries.GET_SKILLS_METHOD, proc.getName());
+
+    proc = this.fProcedures.get(ShindigNativeQueries.ADD_SKILL_QUERY);
+    Assert.assertNotNull(proc);
+    Assert.assertEquals(ShindigNativeQueries.ADD_SKILL_METHOD, proc.getName());
+
+    proc = this.fProcedures.get(ShindigNativeQueries.REMOVE_SKILL_QUERY);
+    Assert.assertNotNull(proc);
+    Assert.assertEquals(ShindigNativeQueries.REMOVE_SKILL_METHOD, proc.getName());
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -31,10 +31,10 @@ import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.ConvHelper;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.IGraphObject;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.convert.SimpleGraphObject;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
@@ -156,7 +156,7 @@ public class GraphAlbum implements IGraphObject {
   }
 
   private void copyLocation(final Map<String, Object> dto) {
-    final Relationship locRel = this.fNode.getSingleRelationship(Neo4jRelTypes.LOCATED_AT,
+    final Relationship locRel = this.fNode.getSingleRelationship(ShindigRelTypes.LOCATED_AT,
             Direction.OUTGOING);
     if (locRel != null) {
       final Map<String, Object> addMap = new SimpleGraphObject(locRel.getEndNode(), this.fImpl)
@@ -167,7 +167,7 @@ public class GraphAlbum implements IGraphObject {
 
   private void copyMediaItemCount(final Map<String, Object> dto) {
     int count = 0;
-    final Iterable<Relationship> itemRels = this.fNode.getRelationships(Neo4jRelTypes.CONTAINS,
+    final Iterable<Relationship> itemRels = this.fNode.getRelationships(ShindigRelTypes.CONTAINS,
             Direction.OUTGOING);
 
     final Iterator<Relationship> itemIter = itemRels.iterator();
@@ -184,7 +184,7 @@ public class GraphAlbum implements IGraphObject {
     Object type = null;
     final Set<String> mimes = new HashSet<String>();
 
-    final Iterable<Relationship> itemRels = this.fNode.getRelationships(Neo4jRelTypes.CONTAINS,
+    final Iterable<Relationship> itemRels = this.fNode.getRelationships(ShindigRelTypes.CONTAINS,
             Direction.OUTGOING);
 
     for (final Relationship rel : itemRels) {
@@ -204,7 +204,7 @@ public class GraphAlbum implements IGraphObject {
     Object type = null;
     final Set<String> types = new HashSet<String>();
 
-    final Iterable<Relationship> itemRels = this.fNode.getRelationships(Neo4jRelTypes.CONTAINS,
+    final Iterable<Relationship> itemRels = this.fNode.getRelationships(ShindigRelTypes.CONTAINS,
             Direction.OUTGOING);
 
     for (final Relationship rel : itemRels) {
@@ -238,7 +238,7 @@ public class GraphAlbum implements IGraphObject {
 
     if (location != null) {
       Node addNode = null;
-      final Relationship locRel = this.fNode.getSingleRelationship(Neo4jRelTypes.LOCATED_AT,
+      final Relationship locRel = this.fNode.getSingleRelationship(ShindigRelTypes.LOCATED_AT,
               Direction.OUTGOING);
       if (locRel != null) {
         addNode = locRel.getEndNode();
@@ -251,7 +251,7 @@ public class GraphAlbum implements IGraphObject {
 
       addNode = this.fNode.getGraphDatabase().createNode();
       new SimpleGraphObject(addNode, this.fImpl).setData(location);
-      this.fNode.createRelationshipTo(addNode, Neo4jRelTypes.LOCATED_AT);
+      this.fNode.createRelationshipTo(addNode, ShindigRelTypes.LOCATED_AT);
     }
 
     // set new values

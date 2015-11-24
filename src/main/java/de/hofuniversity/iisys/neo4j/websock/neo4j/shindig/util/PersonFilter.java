@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -220,6 +220,11 @@ public class PersonFilter {
    *          person they need to be friends with
    */
   public static void filterNodes(List<Node> people, Node friend) {
+    // skip filtering if there is nothing to filter
+    if (friend == null || people == null) {
+      return;
+    }
+
     final Set<Node> friends = new HashSet<Node>();
     friends.add(friend);
 

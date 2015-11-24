@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -18,12 +18,17 @@
  */
 package de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.logging.Logger;
 
 import org.neo4j.graphdb.Direction;
@@ -34,7 +39,6 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.graphdb.index.IndexHits;
 
-import de.hofuniversity.iisys.neo4j.websock.GraphConfig;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert.GraphPerson;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.PersonFilter;
@@ -49,6 +53,36 @@ import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
  * Implementation of the person service retrieving person data from the Neo4j graph database.
  */
 public class GraphPersonSPI {
+  private static final String PERSON_CR_ACT = "autoactivities.person_create";
+  private static final String PERSON_UPD_ACT = "autoactivities.profile_update";
+  private static final String PERSON_DEL_ACT = "autoactivities.person_delete";
+
+  private static final String STAT_UPD_ACT = "autoactivities.status_update";
+  private static final String STAT_MSG_UPD_ACT = "autoactivities.status_message_update";
+
+  private static final String CREATE_TITLE_PROP = "titles.person.create";
+  private static final String UPDATE_TITLE_PROP = "titles.person.update";
+  private static final String DELETE_TITLE_PROP = "titles.person.delete";
+
+  private static final String PROFILE_NAME_PROP = "names.profile";
+  private static final String STATUS_NAME_PROP = "names.status";
+  private static final String STATUS_MSG_NAME_PROP = "names.statusmessage";
+
+  private static final String STATUS_TITLE_PROP = "titles.status.updated";
+  private static final String STATUS_MSG_TITLE_PROP = "titles.statusmessage.updated";
+
+  private static final int TYPE_CREATE = 0;
+  private static final int TYPE_UPDATE = 1;
+  private static final int TYPE_DELETE = 2;
+
+  private static final String VERB_CREATE = "create";
+  private static final String VERB_UPDATE = "update";
+  private static final String VERB_DELETE = "delete";
+
+  private static final String OBJ_TYPE_PROFILE = "shindig-profile";
+  private static final String OBJ_TYPE_STATUS = "shindig-status";
+  private static final String OBJ_TYPE_STATUS_MSG = "shindig-status-message";
+
   private static final String ANONYMOUS_ID = "-1";
 
   private static final String ID_FIELD = "id";
@@ -60,11 +94,23 @@ public class GraphPersonSPI {
 
   private final Index<Node> fPersonNodes, fGroupNodes;
 
+  private final boolean fPersonCreateActivity, fPersonUpdateActivity, fPersonDeleteActivity,
+          fStatusUpdateActivity, fStatusMsgActivity;
+
+  private final String fProfileName, fStatusName, fStatusMsgName;
+  private final String fCreateTitle, fUpdateTitle, fDeleteTitle, fStatusTitle, fStatusMsgTitle;
+
+  private final Map<String, Object> fGeneratorObject;
+
+  private final DateFormat fDateFormat;
+
   private final ImplUtil fImpl;
 
   private final Logger fLogger;
 
   private GraphMessageSPI fMessages;
+  private GraphActivityStreamSPI fActivities;
+  private GraphSkillSPI fSkillSPI;
 
   /**
    * Creates a graph person service using data from the given neo4j database service, according to
@@ -78,12 +124,12 @@ public class GraphPersonSPI {
    * @param impl
    *          implementation utility to use
    */
-  public GraphPersonSPI(GraphDatabaseService database, GraphConfig config, ImplUtil impl) {
+  public GraphPersonSPI(GraphDatabaseService database, Map<String, String> config, ImplUtil impl) {
     if (database == null) {
       throw new NullPointerException("database service was null");
     }
     if (config == null) {
-      throw new NullPointerException("configuration object was null");
+      throw new NullPointerException("configuration object");
     }
     if (impl == null) {
       throw new NullPointerException("implementation utility was null");
@@ -93,9 +139,41 @@ public class GraphPersonSPI {
     this.fPersonNodes = this.fDatabase.index().forNodes(ShindigConstants.PERSON_NODES);
     this.fGroupNodes = this.fDatabase.index().forNodes(ShindigConstants.GROUP_NODES);
 
+    // read configuration
+    this.fPersonCreateActivity = Boolean.parseBoolean(config.get(GraphPersonSPI.PERSON_CR_ACT));
+    this.fPersonUpdateActivity = Boolean.parseBoolean(config.get(GraphPersonSPI.PERSON_UPD_ACT));
+    this.fPersonDeleteActivity = Boolean.parseBoolean(config.get(GraphPersonSPI.PERSON_DEL_ACT));
+
+    this.fStatusUpdateActivity = Boolean.parseBoolean(config.get(GraphPersonSPI.STAT_UPD_ACT));
+    this.fStatusMsgActivity = Boolean.parseBoolean(config.get(GraphPersonSPI.STAT_MSG_UPD_ACT));
+
+    // read (display) names
+    this.fProfileName = config.get(GraphPersonSPI.PROFILE_NAME_PROP);
+    this.fStatusName = config.get(GraphPersonSPI.STATUS_NAME_PROP);
+    this.fStatusMsgName = config.get(GraphPersonSPI.STATUS_MSG_NAME_PROP);
+
+    // read titles
+    this.fCreateTitle = config.get(GraphPersonSPI.CREATE_TITLE_PROP);
+    this.fUpdateTitle = config.get(GraphPersonSPI.UPDATE_TITLE_PROP);
+    this.fDeleteTitle = config.get(GraphPersonSPI.DELETE_TITLE_PROP);
+
+    this.fStatusTitle = config.get(GraphPersonSPI.STATUS_TITLE_PROP);
+    this.fStatusMsgTitle = config.get(GraphPersonSPI.STATUS_MSG_TITLE_PROP);
+
     this.fImpl = impl;
 
     this.fLogger = Logger.getLogger(this.getClass().getName());
+
+    // activity generator object
+    this.fGeneratorObject = new HashMap<String, Object>();
+    this.fGeneratorObject.put(OSFields.ID_FIELD, OSFields.SHINDIG_ID);
+    this.fGeneratorObject.put(OSFields.OBJECT_TYPE, OSFields.APPLICATION_TYPE);
+    this.fGeneratorObject.put(OSFields.DISP_NAME_FIELD, OSFields.SHINDIG_NAME);
+
+    // time stamp formatter
+    final TimeZone tz = TimeZone.getTimeZone(OSFields.TIME_ZONE);
+    this.fDateFormat = new SimpleDateFormat(OSFields.DATE_FORMAT);
+    this.fDateFormat.setTimeZone(tz);
   }
 
   /**
@@ -106,6 +184,26 @@ public class GraphPersonSPI {
    */
   public void setMessages(GraphMessageSPI messages) {
     this.fMessages = messages;
+  }
+
+  /**
+   * Sets the activitystreams service used to create event-based activities.
+   *
+   * @param activities
+   *          activitystreams service to use
+   */
+  public void setActivities(GraphActivityStreamSPI activities) {
+    this.fActivities = activities;
+  }
+
+  /**
+   * Sets the skill service used for additional skill-based lookups.
+   *
+   * @param skills
+   *          skill service to use
+   */
+  public void setSkills(GraphSkillSPI skills) {
+    this.fSkillSPI = skills;
   }
 
   /**
@@ -429,6 +527,23 @@ public class GraphPersonSPI {
       throw new RuntimeException("Person '" + id + "' not found");
     }
 
+    // detect whether it's a status or status message update
+    boolean statusUpdate = false;
+    boolean statusMessageUpdate = false;
+
+    final Object oldStatus = personNode.getProperty("networkPresence", null);
+    final Object oldStatusMsg = personNode.getProperty("status", null);
+    final Object newStatus = person.get("networkPresence");
+    final Object newStatusMsg = person.get("status");
+
+    if (oldStatus == null && newStatus != null || oldStatus != null && !oldStatus.equals(newStatus)) {
+      statusUpdate = true;
+    }
+    if (oldStatusMsg == null && newStatusMsg != null || oldStatusMsg != null
+            && !oldStatusMsg.equals(newStatusMsg)) {
+      statusMessageUpdate = true;
+    }
+
     // set time stamp
     person.put(GraphPersonSPI.UPDATED_FIELD, System.currentTimeMillis());
 
@@ -457,6 +572,22 @@ public class GraphPersonSPI {
       throw new RuntimeException("could not update person:\n" + e.getMessage());
     }
 
+    // generate activities if configured
+    final String userName = getUserName(personNode);
+    if (statusUpdate && newStatus != null) {
+      if (this.fStatusUpdateActivity) {
+        final String status = newStatus.toString();
+        statusUpdateActivity(id, userName, status);
+      }
+    } else if (statusMessageUpdate && newStatusMsg != null) {
+      if (this.fStatusMsgActivity) {
+        final String status = newStatusMsg.toString();
+        statusMsgActivity(id, userName, status);
+      }
+    } else if (this.fPersonUpdateActivity) {
+      personActivity(id, userName, GraphPersonSPI.TYPE_UPDATE);
+    }
+
     return new SingleResult(resultPerson);
   }
 
@@ -480,7 +611,6 @@ public class GraphPersonSPI {
     final List<Map<String, Object>> personList = this.fImpl.newList();
 
     final List<Node> nodeList = new ArrayList<Node>();
-
     // TODO: visibility?
 
     // retrieve all person nodes
@@ -491,8 +621,22 @@ public class GraphPersonSPI {
 
     // filter
     if (options != null && options.get(WebsockConstants.FILTER_OPERATION) != null) {
+      // filter by all fields, including skills
       if (OSFields.GROUP_TYPE_ALL.equals(options.get(WebsockConstants.FILTER_FIELD))) {
-        PersonFilter.filterNodes(nodeList, (String) options.get(WebsockConstants.FILTER_VALUE));
+        final String filterVal = (String) options.get(WebsockConstants.FILTER_VALUE);
+        PersonFilter.filterNodes(nodeList, filterVal);
+
+        // merge results from doing a skill-based search
+        if (filterVal != null && !filterVal.isEmpty() && this.fSkillSPI != null) {
+          final Set<Node> skillPeople = this.fSkillSPI.getPersonNodesForSkill(filterVal);
+          for (final Node tmpNode : nodeList) {
+            // filter out duplicate people
+            if (skillPeople.contains(tmpNode)) {
+              skillPeople.remove(tmpNode);
+            }
+          }
+          nodeList.addAll(skillPeople);
+        }
       } else {
         NodeFilter.filterNodes(nodeList, options);
       }
@@ -563,6 +707,8 @@ public class GraphPersonSPI {
       throw new RuntimeException("User with ID '" + personId + "' already exists");
     }
 
+    boolean success = true;
+
     // set time stamp
     person.put(GraphPersonSPI.UPDATED_FIELD, System.currentTimeMillis());
 
@@ -597,8 +743,15 @@ public class GraphPersonSPI {
     } catch (final Exception e) {
       trans.failure();
       trans.finish();
+      success = false;
       e.printStackTrace();
       throw new RuntimeException("could not create person:\n" + e.getMessage());
+    }
+
+    // create activity if configured
+    if (this.fPersonCreateActivity && success) {
+      final String userName = getUserName(node);
+      personActivity(personId, userName, GraphPersonSPI.TYPE_CREATE);
     }
 
     // TODO: hooks to create other required nodes, for example initial message collections
@@ -620,15 +773,163 @@ public class GraphPersonSPI {
       throw new RuntimeException("User with ID '" + id + "' does not exist");
     }
 
+    boolean success = false;
+    final String userName = getUserName(node);
+
     final Transaction trans = this.fDatabase.beginTx();
     try {
+      success = false;
       // TODO: actually delete or deactivate user
       trans.success();
       trans.finish();
     } catch (final Exception e) {
       trans.failure();
       trans.finish();
+      success = false;
       e.printStackTrace();
+    }
+
+    if (this.fPersonDeleteActivity && success) {
+      personActivity(id, userName, GraphPersonSPI.TYPE_DELETE);
+    }
+  }
+
+  private String getUserName(Node user) {
+    String name = null;
+
+    if (user != null) {
+      // try formatted property
+      final Object nameProp = user.getProperty("formatted", null);
+
+      if (nameProp != null) {
+        name = nameProp.toString();
+      } else {
+        // fall back to user ID
+        name = user.getProperty("id").toString();
+      }
+    }
+
+    return name;
+  }
+
+  private void personActivity(String userId, String userName, int type) {
+    // TODO: system user or user created/deleted self?
+    if (this.fActivities != null) {
+      final Map<String, Object> activity = new HashMap<String, Object>();
+
+      final Map<String, Object> actor = new HashMap<String, Object>();
+      actor.put(OSFields.ID_FIELD, userId);
+      actor.put(OSFields.DISP_NAME_FIELD, userName);
+      actor.put(OSFields.OBJECT_TYPE, OSFields.PERSON_TYPE);
+      activity.put(OSFields.ACTOR_FIELD, actor);
+
+      switch (type) {
+      case TYPE_CREATE:
+        activity.put(OSFields.VERB_FIELD, GraphPersonSPI.VERB_CREATE);
+        activity.put(OSFields.TITLE_FIELD, this.fCreateTitle);
+        break;
+
+      case TYPE_UPDATE:
+        activity.put(OSFields.VERB_FIELD, GraphPersonSPI.VERB_UPDATE);
+        activity.put(OSFields.TITLE_FIELD, this.fUpdateTitle);
+
+        final Map<String, Object> object = new HashMap<String, Object>();
+        object.put(OSFields.DISP_NAME_FIELD, this.fProfileName);
+        object.put(OSFields.OBJECT_TYPE, GraphPersonSPI.OBJ_TYPE_PROFILE);
+        activity.put(OSFields.OBJECT_FIELD, object);
+
+        break;
+
+      case TYPE_DELETE:
+        activity.put(OSFields.VERB_FIELD, GraphPersonSPI.VERB_DELETE);
+        activity.put(OSFields.TITLE_FIELD, this.fDeleteTitle);
+        break;
+
+      // undefined type, abort
+      default:
+        return;
+      }
+
+      // generator
+      activity.put(OSFields.GENERATOR_FIELD, this.fGeneratorObject);
+
+      // generate time stamp
+      final String timestamp = this.fDateFormat.format(new Date(System.currentTimeMillis()));
+      activity.put(OSFields.ACT_PUBLISHED_FIELD, timestamp);
+
+      try {
+        this.fActivities.createActivityEntry(userId, null, OSFields.SHINDIG_ID, activity, null);
+      } catch (final Exception e) {
+        // don't fail, exception is already logged in the activity service
+      }
+    }
+  }
+
+  private void statusUpdateActivity(String userId, String userName, String status) {
+    if (this.fActivities != null) {
+      final Map<String, Object> activity = new HashMap<String, Object>();
+
+      final Map<String, Object> actor = new HashMap<String, Object>();
+      actor.put(OSFields.ID_FIELD, userId);
+      actor.put(OSFields.DISP_NAME_FIELD, userName);
+      actor.put(OSFields.OBJECT_TYPE, OSFields.PERSON_TYPE);
+      activity.put(OSFields.ACTOR_FIELD, actor);
+
+      final Map<String, Object> object = new HashMap<String, Object>();
+      object.put(OSFields.DISP_NAME_FIELD, this.fStatusName);
+      object.put(OSFields.OBJECT_TYPE, GraphPersonSPI.OBJ_TYPE_STATUS);
+      object.put(OSFields.CONTENT_FIELD, status);
+      activity.put(OSFields.OBJECT_FIELD, object);
+
+      activity.put(OSFields.TITLE_FIELD, this.fStatusTitle);
+      activity.put(OSFields.VERB_FIELD, GraphPersonSPI.VERB_UPDATE);
+
+      // generator
+      activity.put(OSFields.GENERATOR_FIELD, this.fGeneratorObject);
+
+      // generate time stamp
+      final String timestamp = this.fDateFormat.format(new Date(System.currentTimeMillis()));
+      activity.put(OSFields.ACT_PUBLISHED_FIELD, timestamp);
+
+      try {
+        this.fActivities.createActivityEntry(userId, null, OSFields.SHINDIG_ID, activity, null);
+      } catch (final Exception e) {
+        // don't fail, exception is already logged in the activity service
+      }
+    }
+  }
+
+  private void statusMsgActivity(String userId, String userName, String status) {
+    if (this.fActivities != null) {
+      final Map<String, Object> activity = new HashMap<String, Object>();
+
+      final Map<String, Object> actor = new HashMap<String, Object>();
+      actor.put(OSFields.ID_FIELD, userId);
+      actor.put(OSFields.DISP_NAME_FIELD, userName);
+      actor.put(OSFields.OBJECT_TYPE, OSFields.PERSON_TYPE);
+      activity.put(OSFields.ACTOR_FIELD, actor);
+
+      final Map<String, Object> object = new HashMap<String, Object>();
+      object.put(OSFields.DISP_NAME_FIELD, this.fStatusMsgName);
+      object.put(OSFields.OBJECT_TYPE, GraphPersonSPI.OBJ_TYPE_STATUS_MSG);
+      object.put(OSFields.CONTENT_FIELD, status);
+      activity.put(OSFields.OBJECT_FIELD, object);
+
+      activity.put(OSFields.TITLE_FIELD, this.fStatusMsgTitle);
+      activity.put(OSFields.VERB_FIELD, GraphPersonSPI.VERB_UPDATE);
+
+      // generator
+      activity.put(OSFields.GENERATOR_FIELD, this.fGeneratorObject);
+
+      // generate time stamp
+      final String timestamp = this.fDateFormat.format(new Date(System.currentTimeMillis()));
+      activity.put(OSFields.ACT_PUBLISHED_FIELD, timestamp);
+
+      try {
+        this.fActivities.createActivityEntry(userId, null, OSFields.SHINDIG_ID, activity, null);
+      } catch (final Exception e) {
+        // don't fail, exception is already logged in the activity service
+      }
     }
   }
 }

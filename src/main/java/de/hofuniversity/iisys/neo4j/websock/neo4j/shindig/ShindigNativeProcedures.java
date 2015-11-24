@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Institute of Information Systems, Hof University
+ * Copyright (c) 2012-2015 Institute of Information Systems, Hof University
  *
  * This file is part of "Apache Shindig WebSocket Server Routines".
  *
@@ -20,9 +20,12 @@ package de.hofuniversity.iisys.neo4j.websock.neo4j.shindig;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,7 +33,6 @@ import org.neo4j.graphdb.GraphDatabaseService;
 
 import com.google.inject.Inject;
 
-import de.hofuniversity.iisys.neo4j.websock.GraphConfig;
 import de.hofuniversity.iisys.neo4j.websock.calls.IStoredProcedure;
 import de.hofuniversity.iisys.neo4j.websock.calls.NativeProcedure;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.service.IDManager;
@@ -43,8 +45,10 @@ import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphFriendSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphGroupSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphMediaItemSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphMessageSPI;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphOrganizationSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphPersonSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphSPI;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphSkillSPI;
 import de.hofuniversity.iisys.neo4j.websock.procedures.IProcedureProvider;
 import de.hofuniversity.iisys.neo4j.websock.shindig.ShindigNativeQueries;
 import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
@@ -54,7 +58,13 @@ import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
  * reflection.
  */
 public class ShindigNativeProcedures implements IProcedureProvider {
-  private final GraphConfig fConfig;
+  private static final String PROPERTIES = "shindig-serverroutines";
+  private static final String LANG_PROPS = "shindig-serverroutines-lang";
+  private static final String LOCALE_PROP = "locale";
+
+  private static final Map<Class<?>, Object> fServices = new HashMap<Class<?>, Object>();
+
+  private final Map<String, String> fConfig;
   private final GraphDatabaseService fDb;
 
   private final ImplUtil fImpl;
@@ -62,25 +72,77 @@ public class ShindigNativeProcedures implements IProcedureProvider {
   private final Logger fLogger;
 
   /**
-   * Creates an instance of the Shindig native stored procedure initializer based on the given
-   * configuration and graph database service, using the given list and map implementations. None of
-   * the parameters may be null.
+   * Retrieves a service implementation for a given class or interface. Throws a RuntimeException if
+   * there are class casting problems.
    *
-   * @param config
-   *          configuration object to use
+   * @param clazz
+   *          interface or class to retrieve an instance for
+   * @return implementation or null
+   */
+  @SuppressWarnings("unchecked")
+  public static <T> T getService(Class<T> clazz) {
+    final Object value = ShindigNativeProcedures.fServices.get(clazz);
+    return (T) value;
+  }
+
+  /**
+   * Sets a service implementation for a given class or interface.
+   *
+   * @param clazz
+   *          interface or class to set an instance for
+   * @param impl
+   *          implementing object
+   */
+  public static <T> void addService(Class<T> clazz, T impl) {
+    ShindigNativeProcedures.fServices.put(clazz, impl);
+  }
+
+  /**
+   * Creates an instance of the Shindig native stored procedure initializer based on the given graph
+   * database service, using the given list and map implementations. None of the parameters may be
+   * null.
+   *
    * @param database
    *          database service to use
    * @param impl
    *          implementation utility
    */
   @Inject
-  public ShindigNativeProcedures(GraphConfig config, GraphDatabaseService database, ImplUtil impl) {
-    this.fConfig = config;
+  public ShindigNativeProcedures(GraphDatabaseService database, ImplUtil impl) {
+    // load configuration
+    this.fConfig = new HashMap<String, String>();
+    loadConfig();
+
     this.fDb = database;
+    ShindigNativeProcedures.addService(GraphDatabaseService.class, this.fDb);
 
     this.fImpl = impl;
+    ShindigNativeProcedures.addService(ImplUtil.class, this.fImpl);
 
     this.fLogger = Logger.getLogger(this.getClass().getName());
+  }
+
+  private void loadConfig() {
+    final ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    ResourceBundle rb = ResourceBundle.getBundle(ShindigNativeProcedures.PROPERTIES,
+            Locale.getDefault(), loader);
+
+    Enumeration<String> keys = rb.getKeys();
+    String key = null;
+    while (keys.hasMoreElements()) {
+      key = keys.nextElement();
+      this.fConfig.put(key, rb.getString(key));
+    }
+
+    // read language-specific file
+    final Locale loc = new Locale(this.fConfig.get(ShindigNativeProcedures.LOCALE_PROP));
+    rb = ResourceBundle.getBundle(ShindigNativeProcedures.LANG_PROPS, loc, loader);
+
+    keys = rb.getKeys();
+    while (keys.hasMoreElements()) {
+      key = keys.nextElement();
+      this.fConfig.put(key, rb.getString(key));
+    }
   }
 
   @Override
@@ -91,24 +153,53 @@ public class ShindigNativeProcedures implements IProcedureProvider {
 
     // create native back-end routines
     final GraphPersonSPI personSPI = new GraphPersonSPI(this.fDb, this.fConfig, this.fImpl);
-    final GraphFriendSPI friendSPI = new GraphFriendSPI(this.fDb, personSPI, this.fImpl);
+    ShindigNativeProcedures.addService(GraphPersonSPI.class, personSPI);
+
+    final GraphFriendSPI friendSPI = new GraphFriendSPI(this.fDb, this.fConfig, personSPI,
+            this.fImpl);
+    ShindigNativeProcedures.addService(GraphFriendSPI.class, friendSPI);
+
     final GraphGroupSPI groupSPI = new GraphGroupSPI(personSPI, this.fImpl);
+    ShindigNativeProcedures.addService(GraphGroupSPI.class, groupSPI);
+
     final GraphSPI graphSPI = new GraphSPI(personSPI, this.fImpl);
+    ShindigNativeProcedures.addService(GraphSPI.class, graphSPI);
 
     final ActivityObjectService actObjSPI = new ActivityObjectService(this.fDb, this.fConfig,
-            this.fImpl);
+            idMan, this.fImpl);
+    ShindigNativeProcedures.addService(ActivityObjectService.class, actObjSPI);
+
     final ApplicationService appSPI = new ApplicationService(this.fDb);
+    ShindigNativeProcedures.addService(ApplicationService.class, appSPI);
+
     final GraphActivityStreamSPI activitySPI = new GraphActivityStreamSPI(this.fDb, personSPI,
             actObjSPI, appSPI, idMan, this.fImpl);
+    ShindigNativeProcedures.addService(GraphActivityStreamSPI.class, activitySPI);
+
+    personSPI.setActivities(activitySPI);
+    friendSPI.setActivities(activitySPI);
 
     final GraphAppDataSPI appDataSPI = new GraphAppDataSPI(this.fDb, personSPI, appSPI, this.fImpl);
+    ShindigNativeProcedures.addService(GraphAppDataSPI.class, appDataSPI);
 
     final GraphMessageSPI messageSPI = new GraphMessageSPI(this.fDb, personSPI, idMan, this.fImpl);
+    ShindigNativeProcedures.addService(GraphMessageSPI.class, messageSPI);
     personSPI.setMessages(messageSPI);
 
     final GraphAlbumSPI albumSPI = new GraphAlbumSPI(this.fDb, personSPI, idMan, this.fImpl);
+    ShindigNativeProcedures.addService(GraphAlbumSPI.class, albumSPI);
+
     final GraphMediaItemSPI mediaItemSPI = new GraphMediaItemSPI(this.fDb, personSPI, idMan,
             this.fImpl);
+    ShindigNativeProcedures.addService(GraphMediaItemSPI.class, mediaItemSPI);
+
+    final GraphSkillSPI skillSPI = new GraphSkillSPI(this.fDb, this.fConfig, personSPI, this.fImpl);
+    skillSPI.setActivities(activitySPI);
+    personSPI.setSkills(skillSPI);
+    ShindigNativeProcedures.addService(GraphSkillSPI.class, skillSPI);
+
+    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, this.fConfig);
+    ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
 
     // add individual service methods
     try {
@@ -121,6 +212,7 @@ public class ShindigNativeProcedures implements IProcedureProvider {
       addMessageService(messageSPI, procedures);
       addAlbumService(albumSPI, procedures);
       addMediaItemService(mediaItemSPI, procedures);
+      addSkillService(skillSPI, procedures);
     } catch (final Exception e) {
       e.printStackTrace();
       this.fLogger.log(Level.SEVERE, "could not create native Shindig procedures", e);
@@ -786,5 +878,72 @@ public class ShindigNativeProcedures implements IProcedureProvider {
     proc = new NativeProcedure(ShindigNativeQueries.UPDATE_MEDIA_ITEM_METHOD, mediaItemSPI,
             updateMediaItem, paramNames);
     procedures.put(ShindigNativeQueries.UPDATE_MEDIA_ITEM_QUERY, proc);
+  }
+
+  private void addSkillService(final GraphSkillSPI skillSPI,
+          final Map<String, IStoredProcedure> procedures) throws Exception {
+
+    // autocompletion
+    final Method autocompleteSkill = GraphSkillSPI.class.getMethod(
+            ShindigNativeQueries.GET_SKILL_AUTOCOMPLETION_METHOD, String.class, Map.class);
+
+    List<String> paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.AUTOCOMPLETE_FRAGMENT);
+    paramNames.add(ShindigNativeQueries.OPTIONS_MAP);
+
+    IStoredProcedure proc = new NativeProcedure(
+            ShindigNativeQueries.GET_SKILL_AUTOCOMPLETION_METHOD, skillSPI, autocompleteSkill,
+            paramNames);
+    procedures.put(ShindigNativeQueries.GET_SKILL_AUTOCOMPLETION_QUERY, proc);
+
+    // get skills
+    final Method getSkills = GraphSkillSPI.class.getMethod(ShindigNativeQueries.GET_SKILLS_METHOD,
+            String.class, Map.class);
+
+    paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.USER_ID);
+    paramNames.add(ShindigNativeQueries.OPTIONS_MAP);
+
+    proc = new NativeProcedure(ShindigNativeQueries.GET_SKILLS_METHOD, skillSPI, getSkills,
+            paramNames);
+    procedures.put(ShindigNativeQueries.GET_SKILLS_QUERY, proc);
+
+    // add skill
+    final Method addSkill = GraphSkillSPI.class.getMethod(ShindigNativeQueries.ADD_SKILL_METHOD,
+            String.class, String.class, String.class);
+
+    paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.USER_ID);
+    paramNames.add(ShindigNativeQueries.SKILL_LINKER);
+    paramNames.add(ShindigNativeQueries.SKILL);
+
+    proc = new NativeProcedure(ShindigNativeQueries.ADD_SKILL_METHOD, skillSPI, addSkill,
+            paramNames);
+    procedures.put(ShindigNativeQueries.ADD_SKILL_QUERY, proc);
+
+    // remove skill
+    final Method removeSkill = GraphSkillSPI.class.getMethod(
+            ShindigNativeQueries.REMOVE_SKILL_METHOD, String.class, String.class, String.class);
+
+    paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.USER_ID);
+    paramNames.add(ShindigNativeQueries.SKILL_LINKER);
+    paramNames.add(ShindigNativeQueries.SKILL);
+
+    proc = new NativeProcedure(ShindigNativeQueries.REMOVE_SKILL_METHOD, skillSPI, removeSkill,
+            paramNames);
+    procedures.put(ShindigNativeQueries.REMOVE_SKILL_QUERY, proc);
+
+    // get people by skill
+    final Method getPeopleBySkill = GraphSkillSPI.class.getMethod(
+            ShindigNativeQueries.GET_PEOPLE_BY_SKILL_METHOD, String.class, Map.class, List.class);
+    paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.SKILL);
+    paramNames.add(ShindigNativeQueries.OPTIONS_MAP);
+    paramNames.add(ShindigNativeQueries.FIELD_LIST);
+
+    proc = new NativeProcedure(ShindigNativeQueries.GET_PEOPLE_BY_SKILL_METHOD, skillSPI,
+            getPeopleBySkill, paramNames);
+    procedures.put(ShindigNativeQueries.GET_PEOPLE_BY_SKILL_QUERY, proc);
   }
 }
