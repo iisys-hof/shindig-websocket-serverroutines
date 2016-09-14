@@ -9,6 +9,17 @@
   Neo4j WebSocket Server.
 
 
+  processMining:
+  --------------
+
+  Additional feature for SCHub only:
+  https://github.com/iisys-hof/tfidf-cosinesimilarity-processmining
+
+  Configuration:
+    GraphProcessMiningSPI: MIN_CYCLES_COUNT =  Count of iterations which have
+    to be saved per docType before the activity mining starts.
+
+
   System Requirements
   -------------------
 
@@ -59,18 +70,29 @@
 
     9. execute 'mvn install'
 
-    10. Download the source code of "shindig-websocket-serverroutines" and
+    10. Download the source code of "tfidf-cosinesimilarity-processmining" and
+      extract it
+      The projects's sources can be found at
+      "https://github.com/iisys-hof/tfidf-cosinesimilarity-processmining"
+      and can be downloaded using git by executing
+      'git clone https://github.com/iisys-hof/tfidf-cosinesimilarity-processmining.git'
+
+    11. Open a terminal and enter the root directory containing the file pom.xml
+
+    12. execute 'mvn install'
+
+    13. Download the source code of "shindig-websocket-serverroutines" and
       extract it
       The projects's sources can be found at
       "https://github.com/iisys-hof/shindig-websocket-common"
       and can be downloaded using git by executing
       'git clone https://github.com/iisys-hof/shindig-websocket-common.git'.
 
-    11. Open a terminal and enter the root directory containing the file pom.xml
+    14. Open a terminal and enter the root directory containing the file pom.xml
 
-    12. execute 'mvn install'
+    15. execute 'mvn install'
 
-    13. You should now find a library jar file in the 'target' directory.
+    16. You should now find a library jar file in the 'target' directory.
 
   Alternatively, you can use precompiled jars.
 
@@ -110,19 +132,25 @@
     <dependency>
       <groupId>de.hofuniversity.iisys</groupId>
       <artifactId>neo4j-websocket-server</artifactId>
-      <version>0.5.1</version>
+      <version>0.5.2</version>
     </dependency>
 
     <dependency>
       <groupId>de.hofuniversity.iisys</groupId>
       <artifactId>shindig-websocket-common</artifactId>
-      <version>2.5.2-2</version>
+      <version>2.5.2-4</version>
+    </dependency>
+
+	<dependency>
+      <groupId>de.iisys.schub</groupId>
+      <artifactId>tfidf-cosinesimilarity-processmining</artifactId>
+      <version>0.0.1</version>
     </dependency>
 
     <dependency>
       <groupId>de.hofuniversity.iisys</groupId>
       <artifactId>shindig-websocket-serverroutines</artifactId>
-      <version>2.5.2-10</version>
+      <version>2.5.2-15</version>
     </dependency>
 
 
@@ -570,3 +598,14 @@
           "skill" - skill name fragment to search for
         returns
           list of people linked to matching skills
+
+    Organizations:
+      getHierarchyPath - retrieves the hierarchical path between two users
+        parameters:
+          "userId" - ID of the user at the beginnig of the path
+          "target" - ID of the user at the end of the path
+          "fields" - list of fields to retrieve for people
+        returns
+          a list of maps, alternating between a person object and a
+          relationship object which can have the ID "@managed_by" or
+          "@manager_of" depending on its direction

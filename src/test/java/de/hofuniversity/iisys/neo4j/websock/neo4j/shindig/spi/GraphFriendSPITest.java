@@ -73,12 +73,13 @@ public class GraphFriendSPITest {
 
     final Map<String, String> config = new HashMap<String, String>();
 
-    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, config);
-    ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
-
     this.fPersonSPI = new GraphPersonSPI(this.fDb, config, new ImplUtil(BasicBSONList.class,
             BasicBSONObject.class));
     ShindigNativeProcedures.addService(GraphPersonSPI.class, this.fPersonSPI);
+
+    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, this.fPersonSPI, config,
+            new ImplUtil(BasicBSONList.class, BasicBSONObject.class));
+    ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
 
     this.fFriendSPI = new GraphFriendSPI(this.fDb, config, this.fPersonSPI, new ImplUtil(
             BasicBSONList.class, BasicBSONObject.class));

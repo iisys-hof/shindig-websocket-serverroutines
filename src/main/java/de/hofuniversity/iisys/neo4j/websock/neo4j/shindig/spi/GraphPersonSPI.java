@@ -41,6 +41,7 @@ import org.neo4j.graphdb.index.IndexHits;
 
 import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert.GraphPerson;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ListFieldListFilter;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.PersonFilter;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.util.NodeFilter;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.util.NodeSorter;
@@ -393,6 +394,11 @@ public class GraphPersonSPI {
       PersonFilter.filterNodes(nodeList, filterNode);
     } else if (OSFields.GROUP_TYPE_ALL.equals(options.get(WebsockConstants.FILTER_FIELD))) {
       PersonFilter.filterNodes(nodeList, options.get(WebsockConstants.FILTER_VALUE).toString());
+    }
+    // use list field list filter for certain fields
+    else if (ListFieldListFilter.SUPPORTED_FIELDS.contains(options
+            .get(WebsockConstants.FILTER_FIELD))) {
+      ListFieldListFilter.filterNodes(nodeList, options);
     } else {
       NodeFilter.filterNodes(nodeList, options);
     }
@@ -637,6 +643,11 @@ public class GraphPersonSPI {
           }
           nodeList.addAll(skillPeople);
         }
+      }
+      // use list field list filter for certain fields
+      else if (ListFieldListFilter.SUPPORTED_FIELDS.contains(options
+              .get(WebsockConstants.FILTER_FIELD))) {
+        ListFieldListFilter.filterNodes(nodeList, options);
       } else {
         NodeFilter.filterNodes(nodeList, options);
       }

@@ -36,6 +36,7 @@ public class ShindigConstants {
   public static final String SKILL_NODES = "skills";
   public static final String ORG_UNIT_NODES = "orgunits";
   public static final String ORG_NODE = "organization";
+  public static final String DOC_TYPE_NODES = "doctypes";
 
   // other
   public static final String PERSON_TYPE = "person";

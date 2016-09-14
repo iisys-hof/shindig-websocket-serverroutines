@@ -65,6 +65,7 @@ public class GraphOrganization implements IGraphObject {
 
   private static final String ORG_UNIT_FIELD = "orgUnit";
   private static final String LOCATION_FIELD = "location";
+  private static final String SITE_FIELD = "site";
 
   private static final ConvHelper HELPER = createHelper();
 
@@ -83,6 +84,9 @@ public class GraphOrganization implements IGraphObject {
     relMapped.add(GraphOrganization.DEPARTMENT_HEAD_FIELD);
     relMapped.add(GraphOrganization.MANAGER_ID_FIELD);
     relMapped.add(GraphOrganization.SECRETARY_ID_FIELD);
+
+    relMapped.add(GraphOrganization.LOCATION_FIELD);
+    relMapped.add(GraphOrganization.SITE_FIELD);
 
     return new ConvHelper(null, relMapped, null);
   }
@@ -270,6 +274,8 @@ public class GraphOrganization implements IGraphObject {
     // extended model properties
     relVals.put(GraphOrganization.LOCATION_FIELD,
             organization.get(GraphOrganization.LOCATION_FIELD));
+    relVals.put(GraphOrganization.SITE_FIELD,
+            organization.get(GraphOrganization.SITE_FIELD));
     // TODO: how to do this when other person has not been created yet?
     // TODO: two-pass syncing? lazy setting?
     // GraphOrganization.MANAGER_ID_FIELD

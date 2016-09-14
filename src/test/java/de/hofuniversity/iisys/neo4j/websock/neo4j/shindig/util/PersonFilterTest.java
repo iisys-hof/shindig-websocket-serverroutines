@@ -19,8 +19,12 @@
 package de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.bson.BasicBSONObject;
+import org.bson.types.BasicBSONList;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -32,8 +36,11 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.ShindigNativeProcedures;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphOrganizationSPI;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphPersonSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.ShindigConstants;
+import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
  * Test routine to check whether the special person node filtering utility is working correctly.
@@ -80,6 +87,16 @@ public class PersonFilterTest {
       }
     });
 
+    final Map<String, String> config = new HashMap<String, String>();
+
+    GraphPersonSPI personSPI = new GraphPersonSPI(this.fDb, config, new ImplUtil(BasicBSONList.class,
+            BasicBSONObject.class));
+    ShindigNativeProcedures.addService(GraphPersonSPI.class, personSPI);
+
+    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, personSPI, config,
+            new ImplUtil(BasicBSONList.class, BasicBSONObject.class));
+    ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
+    
     createTestData();
   }
 
@@ -120,38 +137,38 @@ public class PersonFilterTest {
     // addresses
     final Node johnAdd1 = this.fDb.createNode();
     johnAdd1.setProperty(PersonFilterTest.ADD_FORM_ATT, PersonFilterTest.ADD1);
-    johndoe.createRelationshipTo(johnAdd1, Neo4jRelTypes.LOCATED_AT);
+    johndoe.createRelationshipTo(johnAdd1, ShindigRelTypes.LOCATED_AT);
 
     final Node johnAdd2 = this.fDb.createNode();
     johnAdd2.setProperty(PersonFilterTest.ADD_FORM_ATT, PersonFilterTest.ADD2);
-    johndoe.createRelationshipTo(johnAdd2, Neo4jRelTypes.LOCATED_AT);
+    johndoe.createRelationshipTo(johnAdd2, ShindigRelTypes.LOCATED_AT);
 
-    // organizations
-    final Node org1 = this.fDb.createNode();
-    org1.setProperty(PersonFilterTest.ORG_NAME_ATT, PersonFilterTest.ORG1_NAME);
+    // departments / org units
+    final Node dep1 = this.fDb.createNode();
+    dep1.setProperty(PersonFilterTest.ORG_NAME_ATT, PersonFilterTest.ORG1_NAME);
 
-    final Node org2 = this.fDb.createNode();
-    org2.setProperty(PersonFilterTest.ORG_NAME_ATT, PersonFilterTest.ORG2_NAME);
+    final Node dep2 = this.fDb.createNode();
+    dep2.setProperty(PersonFilterTest.ORG_NAME_ATT, PersonFilterTest.ORG2_NAME);
 
     // affiliations
-    Relationship workRel = janedoe.createRelationshipTo(org1, Neo4jRelTypes.AFFILIATED);
+    Relationship workRel = janedoe.createRelationshipTo(dep1, ShindigRelTypes.EMPLOYED);
     workRel.setProperty(PersonFilterTest.AFF_TITLE_ATT, PersonFilterTest.JANE_TITLE1);
 
-    workRel = janedoe.createRelationshipTo(org2, Neo4jRelTypes.AFFILIATED);
+    workRel = janedoe.createRelationshipTo(dep2, ShindigRelTypes.EMPLOYED);
     workRel.setProperty(PersonFilterTest.AFF_TITLE_ATT, PersonFilterTest.JANE_TITLE2);
 
-    workRel = jackdoe.createRelationshipTo(org1, Neo4jRelTypes.AFFILIATED);
+    workRel = jackdoe.createRelationshipTo(dep1, ShindigRelTypes.EMPLOYED);
     workRel.setProperty(PersonFilterTest.AFF_TITLE_ATT, PersonFilterTest.JACK_TITLE);
 
     // e-mail addresses
     final Node jackMails = this.fDb.createNode();
-    jackdoe.createRelationshipTo(jackMails, Neo4jRelTypes.EMAILS);
+    jackdoe.createRelationshipTo(jackMails, ShindigRelTypes.EMAILS);
 
     jackMails.setProperty(PersonFilterTest.VALUE_ATT, PersonFilterTest.JACK_MAILS);
 
     // inter-person relationships
-    johndoe.createRelationshipTo(janedoe, Neo4jRelTypes.FRIEND_OF);
-    jackdoe.createRelationshipTo(janedoe, Neo4jRelTypes.FRIEND_OF);
+    johndoe.createRelationshipTo(janedoe, ShindigRelTypes.FRIEND_OF);
+    jackdoe.createRelationshipTo(janedoe, ShindigRelTypes.FRIEND_OF);
 
     trans.success();
     trans.finish();
@@ -243,7 +260,7 @@ public class PersonFilterTest {
     Assert.assertTrue(list.contains(this.fPeople[1]));
     Assert.assertTrue(list.contains(this.fPeople[2]));
 
-    // organizations
+    // deparments / org units
     list = new ArrayList<Node>();
     list.add(this.fPeople[0]);
     list.add(this.fPeople[1]);
@@ -254,6 +271,8 @@ public class PersonFilterTest {
     Assert.assertEquals(2, list.size());
     Assert.assertTrue(list.contains(this.fPeople[1]));
     Assert.assertTrue(list.contains(this.fPeople[2]));
+    
+    // TODO: not actually testing for central organization node
   }
 
   /**

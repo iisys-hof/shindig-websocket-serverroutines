@@ -221,12 +221,13 @@ public class GraphPersonTest {
     final Map<String, String> config = new HashMap<String, String>();
     config.put(GraphOrganizationSPI.CREATE_DEPS, "true");
 
-    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, config);
-    ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
-
     final GraphPersonSPI personSPI = new GraphPersonSPI(this.fDb, config, new ImplUtil(
             LinkedList.class, HashMap.class));
     ShindigNativeProcedures.addService(GraphPersonSPI.class, personSPI);
+
+    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, personSPI, config,
+            new ImplUtil(LinkedList.class, HashMap.class));
+    ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
 
     createTestData();
   }

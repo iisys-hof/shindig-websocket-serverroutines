@@ -47,6 +47,7 @@ import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphMediaItemSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphMessageSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphOrganizationSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphPersonSPI;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphProcessMiningSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphSPI;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphSkillSPI;
 import de.hofuniversity.iisys.neo4j.websock.procedures.IProcedureProvider;
@@ -198,8 +199,13 @@ public class ShindigNativeProcedures implements IProcedureProvider {
     personSPI.setSkills(skillSPI);
     ShindigNativeProcedures.addService(GraphSkillSPI.class, skillSPI);
 
-    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, this.fConfig);
+    final GraphOrganizationSPI orgSPI = new GraphOrganizationSPI(this.fDb, personSPI, this.fConfig,
+            this.fImpl);
     ShindigNativeProcedures.addService(GraphOrganizationSPI.class, orgSPI);
+
+    final GraphProcessMiningSPI processMiningSPI = new GraphProcessMiningSPI(this.fDb,
+            this.fConfig, personSPI, activitySPI, this.fImpl);
+    ShindigNativeProcedures.addService(GraphProcessMiningSPI.class, processMiningSPI);
 
     // add individual service methods
     try {
@@ -213,6 +219,8 @@ public class ShindigNativeProcedures implements IProcedureProvider {
       addAlbumService(albumSPI, procedures);
       addMediaItemService(mediaItemSPI, procedures);
       addSkillService(skillSPI, procedures);
+      addOrgService(orgSPI, procedures);
+      addProcessMiningService(processMiningSPI, procedures);
     } catch (final Exception e) {
       e.printStackTrace();
       this.fLogger.log(Level.SEVERE, "could not create native Shindig procedures", e);
@@ -945,5 +953,62 @@ public class ShindigNativeProcedures implements IProcedureProvider {
     proc = new NativeProcedure(ShindigNativeQueries.GET_PEOPLE_BY_SKILL_METHOD, skillSPI,
             getPeopleBySkill, paramNames);
     procedures.put(ShindigNativeQueries.GET_PEOPLE_BY_SKILL_QUERY, proc);
+  }
+
+  private void addOrgService(final GraphOrganizationSPI orgSPI,
+          final Map<String, IStoredProcedure> procedures) throws Exception {
+    // get organization hierarchy paths between people
+    final Method getPeopleBySkill = GraphOrganizationSPI.class.getMethod(
+            ShindigNativeQueries.GET_HIERARCHY_PATH_METHOD, String.class, String.class, List.class);
+
+    final List<String> paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.USER_ID);
+    paramNames.add(ShindigNativeQueries.TARGET_USER_ID);
+    paramNames.add(ShindigNativeQueries.FIELD_LIST);
+
+    final IStoredProcedure proc = new NativeProcedure(
+            ShindigNativeQueries.GET_HIERARCHY_PATH_METHOD, orgSPI, getPeopleBySkill, paramNames);
+    procedures.put(ShindigNativeQueries.GET_HIERARCHY_PATH_QUERY, proc);
+  }
+
+  private void addProcessMiningService(final GraphProcessMiningSPI processSPI,
+          final Map<String, IStoredProcedure> procedures) throws Exception {
+
+    List<String> paramNames = new ArrayList<String>();
+    IStoredProcedure proc;
+
+    // add process cycle
+    final Method addProcessCycle = GraphProcessMiningSPI.class.getMethod(
+            ShindigNativeQueries.ADD_PROCESS_CYCLE_METHOD, String.class, Map.class);
+
+    paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.PROCESS_CYCLE_DOC_TYPE);
+    paramNames.add(ShindigNativeQueries.PROCESS_CYCLE_OBJECT);
+
+    proc = new NativeProcedure(ShindigNativeQueries.ADD_PROCESS_CYCLE_METHOD, processSPI,
+            addProcessCycle, paramNames);
+    procedures.put(ShindigNativeQueries.ADD_PROCESS_CYCLE_QUERY, proc);
+    
+    // delete process cycles
+    final Method deleteProcessCycles =  GraphProcessMiningSPI.class.getMethod(
+    		ShindigNativeQueries.DELETE_PROCESS_CYCLES_METHOD, String.class);
+    paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.PROCESS_CYCLE_DOC_TYPE);
+    
+    proc = new NativeProcedure(ShindigNativeQueries.DELETE_PROCESS_CYCLES_METHOD, processSPI,
+    		deleteProcessCycles, paramNames);
+    procedures.put(ShindigNativeQueries.DELETE_PROCESS_CYCLES_QUERY, proc);
+    
+    // get process cycle
+    final Method getProcessCycles = GraphProcessMiningSPI.class.getMethod(ShindigNativeQueries.GET_PROCESS_CYCLES_METHOD,
+            String.class);
+
+    paramNames = new ArrayList<String>();
+    paramNames.add(ShindigNativeQueries.PROCESS_CYCLE_DOC_TYPE);
+//  paramNames.add(ShindigNativeQueries.OPTIONS_MAP);
+
+    proc = new NativeProcedure(ShindigNativeQueries.GET_PROCESS_CYCLES_METHOD, processSPI, getProcessCycles,
+            paramNames);
+    procedures.put(ShindigNativeQueries.GET_PROCESS_CYCLES_QUERY, proc);
   }
 }

@@ -18,9 +18,11 @@
  */
 package de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi;
 
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.neo4j.graphalgo.GraphAlgoFactory;
 import org.neo4j.graphalgo.PathFinder;
@@ -29,12 +31,16 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Path;
 import org.neo4j.graphdb.PathExpander;
+import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.kernel.Traversal;
 
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.convert.GraphPerson;
 import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.util.ShindigRelTypes;
+import de.hofuniversity.iisys.neo4j.websock.result.ListResult;
+import de.hofuniversity.iisys.neo4j.websock.util.ImplUtil;
 
 /**
  * Service managing a central organization, organizational units and departments. An optional
@@ -55,7 +61,12 @@ public class GraphOrganizationSPI implements Runnable {
 
   private static final int MAX_PATH_DEPTH = 12;
 
+  private static final String MANAGER_OF_ID = "@manager_of";
+  private static final String MANAGED_BY_ID = "@managed_by";
+
   private final GraphDatabaseService fDatabase;
+
+  private final GraphPersonSPI fPeople;
 
   private final Index<Node> fOrgUnitNodes;
 
@@ -64,6 +75,10 @@ public class GraphOrganizationSPI implements Runnable {
   private final long fCleanupInterval;
 
   private final boolean fCreateDeps;
+
+  private final ImplUtil fImpl;
+
+  private final PathExpander<Path> fPathExp;
 
   private boolean fActive;
 
@@ -74,18 +89,34 @@ public class GraphOrganizationSPI implements Runnable {
    *
    * @param database
    *          database service to use
+   * @param people
+   *          person service to use
    * @param config
    *          configuration to use
+   * @param impl
+   *          implementation utility to use
    */
-  public GraphOrganizationSPI(GraphDatabaseService database, Map<String, String> config) {
+  public GraphOrganizationSPI(GraphDatabaseService database, GraphPersonSPI people,
+          Map<String, String> config, ImplUtil impl) {
     if (database == null) {
       throw new NullPointerException("database service was null");
+    }
+    if (people == null) {
+      throw new NullPointerException("person service was null");
     }
     if (config == null) {
       throw new NullPointerException("configuration object");
     }
+    if (impl == null) {
+      throw new NullPointerException("implementation utility was null");
+    }
 
     this.fDatabase = database;
+    this.fImpl = impl;
+
+    this.fPeople = people;
+
+    this.fPathExp = Traversal.pathExpanderForTypes(ShindigRelTypes.MANAGER, Direction.BOTH);
 
     this.fOrgUnitNodes = this.fDatabase.index().forNodes(ShindigConstants.ORG_UNIT_NODES);
 
@@ -225,7 +256,81 @@ public class GraphOrganizationSPI implements Runnable {
    * relations and returns it or null, if there is none. The relations are still included in the
    * path, so the direction of the path can be determined.
    *
-   * Not yet implemented.
+   * @param person1
+   *          person at the beginning of the path
+   * @param person2
+   *          person at the end of the path
+   * @param fields
+   *          fields to return for people
+   * @return ordered path between the two people
+   */
+  public ListResult getHierarchyPath(String startId, String endId, List<String> fields) {
+    ListResult result = null;
+    Set<String> fieldSet = null;
+    if (fields != null && !fields.isEmpty()) {
+      fieldSet = new HashSet<String>(fields);
+    }
+
+    // check if people exist
+    final Node person1 = this.fPeople.getPersonNode(startId);
+    final Node person2 = this.fPeople.getPersonNode(endId);
+
+    if (person1 == null) {
+      throw new RuntimeException("person '" + startId + "' not found");
+    }
+    if (person2 == null) {
+      throw new RuntimeException("person '" + endId + "' not found");
+    }
+
+    // determine path
+    final Path hPath = getHierarchyPath(person1, person2);
+
+    final List<Map<String, Object>> resList = this.fImpl.newList();
+    if (hPath != null) {
+      Map<String, Object> objMap = null;
+      Node personNode = null;
+      Relationship manRel = null;
+      for (final PropertyContainer pc : hPath) {
+        // people
+        if (pc instanceof Node) {
+          personNode = (Node) pc;
+          objMap = new GraphPerson(personNode, this.fImpl).toMap(fieldSet);
+          resList.add(objMap);
+        }
+        // manager relations
+        else if (pc instanceof Relationship) {
+          manRel = (Relationship) pc;
+          objMap = this.fImpl.newMap();
+
+          // determine direction using last person node
+          if (manRel.getStartNode().equals(personNode)) {
+            // outgoing -> next user is manager
+            objMap.put(OSFields.ID_FIELD, GraphOrganizationSPI.MANAGED_BY_ID);
+          } else {
+            // incoming -> next user is managed
+            objMap.put(OSFields.ID_FIELD, GraphOrganizationSPI.MANAGER_OF_ID);
+          }
+
+          resList.add(objMap);
+        }
+      }
+
+      result = new ListResult(resList);
+      result.setFirst(0);
+      result.setMax(resList.size());
+      result.setTotal(resList.size());
+    } else {
+      // empty result
+      result = new ListResult(resList);
+    }
+
+    return result;
+  }
+
+  /**
+   * Determines the shortest hierarchical path between two person nodes via "is manager of"
+   * relations and returns it or null, if there is none. The relations are still included in the
+   * path, so the direction of the path can be determined.
    *
    * @param person1
    *          person at the beginning of the path
@@ -236,24 +341,9 @@ public class GraphOrganizationSPI implements Runnable {
   public Path getHierarchyPath(Node person1, Node person2) {
     // shortest path over MANAGER relations
     Path path = null;
-    // TODO: register expanders and path finder on global level
 
-    // managed to manager
-    PathExpander<Path> pathExp = Traversal.pathExpanderForTypes(ShindigRelTypes.MANAGER,
-            Direction.OUTGOING);
-    PathFinder<Path> sPathFinder = GraphAlgoFactory.shortestPath(pathExp,
+    final PathFinder<Path> sPathFinder = GraphAlgoFactory.shortestPath(this.fPathExp,
             GraphOrganizationSPI.MAX_PATH_DEPTH);
-
-    path = sPathFinder.findSinglePath(person1, person2);
-
-    if (path != null) {
-      return path;
-    }
-
-    // manager to managed
-    // TODO: just swap people instead of creating new traversal?
-    pathExp = Traversal.pathExpanderForTypes(ShindigRelTypes.MANAGER, Direction.INCOMING);
-    sPathFinder = GraphAlgoFactory.shortestPath(pathExp, GraphOrganizationSPI.MAX_PATH_DEPTH);
 
     path = sPathFinder.findSinglePath(person1, person2);
 

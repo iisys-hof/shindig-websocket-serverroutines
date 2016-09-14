@@ -14,7 +14,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>de.hofuniversity.iisys</groupId>
 	<artifactId>shindig-websocket-serverroutines</artifactId>
-	<version>2.5.2-10</version>
+	<version>2.5.2-15</version>
 	<licenses>
 		<license>
 			<name>The GNU GENERAL PUBLIC LICENSE, Version 3.0</name>
@@ -45,7 +45,12 @@
 		<dependency>
 			<groupId>de.hofuniversity.iisys</groupId>
 			<artifactId>shindig-websocket-common</artifactId>
-			<version>2.5.2-2</version>
+			<version>2.5.2-4</version>
+		</dependency>
+		<dependency>
+			<groupId>de.iisys.schub</groupId>
+			<artifactId>tfidf-cosinesimilarity-processmining</artifactId>
+			<version>0.0.1</version>
 		</dependency>
 	</dependencies>
 	<name>Apache Shindig WebSocket Server Routines</name>

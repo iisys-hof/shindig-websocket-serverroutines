@@ -27,7 +27,8 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 
-import de.hofuniversity.iisys.neo4j.websock.neo4j.Neo4jRelTypes;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.ShindigNativeProcedures;
+import de.hofuniversity.iisys.neo4j.websock.neo4j.shindig.spi.GraphOrganizationSPI;
 
 /**
  * Utility class for filtering a list of person nodes based on all their fields and connected nodes
@@ -38,9 +39,10 @@ public class PersonFilter {
   private static final String TYPE_FIELD = "type";
 
   /**
-   * Filters a list of person nodes by the values stored in the database. Only works for Returns
-   * without an error if parameters not compatible with this kind of search. Known problem: objects
-   * that don't specify their own toString-method are filtered based on their memory address
+   * Filters a list of person nodes by the values stored in the database. Only works for person
+   * nodes. Returns without an error if parameters not compatible with this kind of search. Known
+   * problem: objects that don't specify their own toString-method are filtered based on their
+   * memory address
    *
    * @param nodes
    *          list of nodes to filter
@@ -98,7 +100,7 @@ public class PersonFilter {
   private static boolean matchAdresses(Node person, final String filterVal) {
     boolean match = false;
 
-    final Iterable<Relationship> locRels = person.getRelationships(Neo4jRelTypes.LOCATED_AT);
+    final Iterable<Relationship> locRels = person.getRelationships(ShindigRelTypes.LOCATED_AT);
 
     Node node = null;
     for (final Relationship rel : locRels) {
@@ -116,7 +118,7 @@ public class PersonFilter {
   private static boolean matchMails(Node person, final String filterVal) {
     boolean match = false;
 
-    final Relationship rel = person.getSingleRelationship(Neo4jRelTypes.EMAILS, Direction.OUTGOING);
+    final Relationship rel = person.getSingleRelationship(ShindigRelTypes.EMAILS, Direction.OUTGOING);
 
     if (rel != null) {
       final Node node = rel.getEndNode();
@@ -136,7 +138,7 @@ public class PersonFilter {
   private static boolean matchPhones(Node person, final String filterVal) {
     boolean match = false;
 
-    final Relationship rel = person.getSingleRelationship(Neo4jRelTypes.PHONE_NUMS,
+    final Relationship rel = person.getSingleRelationship(ShindigRelTypes.PHONE_NUMS,
             Direction.OUTGOING);
 
     if (rel != null) {
@@ -157,20 +159,60 @@ public class PersonFilter {
   private static boolean matchOrganizations(Node person, final String filterVal) {
     boolean match = false;
 
-    final Iterable<Relationship> affiliations = person.getRelationships(Neo4jRelTypes.AFFILIATED);
+    final Iterable<Relationship> affiliations = person.getRelationships(ShindigRelTypes.EMPLOYED);
 
-    Node organization = null;
-    for (final Relationship aff : affiliations) {
-      organization = aff.getEndNode();
+    // get and match global organization node
+    GraphOrganizationSPI orgSpi = ShindigNativeProcedures.getService(GraphOrganizationSPI.class);
+    Node organization = orgSpi.getOrganization();
+    
+    if(organization != null)
+    {
+      match = fieldsMatch(organization, filterVal);
+    }
 
-      match = fieldsMatch(aff, filterVal);
-
-      if (!match) {
-        match = fieldsMatch(organization, filterVal);
-      }
-
-      if (match) {
-        break;
+    if (!match) {
+      for (final Relationship aff : affiliations) {
+        
+        match = fieldsMatch(aff, filterVal);
+  
+        if(!match)
+        {
+          Node dep = null;
+          Node orgUnit = null;
+          
+          if (orgSpi.createDeparments())
+          {
+            // case 1: linked to department
+            dep = aff.getEndNode();
+            
+            if(dep != null)
+            {
+              Relationship inUnitRel = dep.getSingleRelationship(
+                  ShindigRelTypes.IN_UNIT, Direction.OUTGOING);
+              orgUnit = inUnitRel.getEndNode();
+            }
+          }
+          else
+          {
+            // case 2: linked to organizational unit
+            orgUnit = aff.getEndNode();
+          }
+          
+          if(dep != null)
+          {
+            match = fieldsMatch(dep, filterVal);
+          }
+          
+          if(!match
+            && orgUnit != null)
+          {
+            match = fieldsMatch(orgUnit, filterVal);
+          }
+        }
+  
+        if (match) {
+          break;
+        }
       }
     }
 
@@ -229,7 +271,7 @@ public class PersonFilter {
     friends.add(friend);
 
     final Iterable<Relationship> friendRels = friend.getRelationships(Direction.OUTGOING,
-            Neo4jRelTypes.FRIEND_OF);
+            ShindigRelTypes.FRIEND_OF);
     for (final Relationship fRel : friendRels) {
       friends.add(fRel.getEndNode());
     }
